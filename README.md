@@ -12,5 +12,10 @@ Spec-driven, TDD-first Android video converter/editor (`io.bsoft.bconverter`).
 Milestone 1 scope: AppConfig, OrientationPolicy, MediaSource, MediaMetadata, ProcessingState machine,
 MediaEngine interface + FakeMediaEngine, Hilt DI, Navigation, Home screen.
 
+## Phase 2 — File management (done)
+`InputResolver` (content:// -> staged File, FileSource used in place), `MediaFileValidator`,
+`StagingDirectory` (sanitised names, stale cleanup), `AndroidContentReader`, SAF picker flow
+(`PickInputScreen`, wired to Convert Video / Extract Audio), typed `InputError`s with user-facing messages.
+
 ## Next milestone
-File selection: `InputResolver` (content URI -> staged file), SAF picker contract. Tests first.
+Phase 3 — Media probing: FFprobe JSON fixtures -> `MediaMetadata` parser (tests first), then the real FFprobe integration.
