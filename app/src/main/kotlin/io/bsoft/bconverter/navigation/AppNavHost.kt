@@ -9,6 +9,8 @@ import androidx.navigation.compose.rememberNavController
 import io.bsoft.bconverter.feature.home.HomeDestination
 import io.bsoft.bconverter.feature.home.HomeScreen
 import io.bsoft.bconverter.feature.home.HomeViewModel
+import io.bsoft.bconverter.feature.pickinput.PickInputScreen
+import io.bsoft.bconverter.feature.pickinput.PickKind
 import io.bsoft.bconverter.feature.placeholder.PlaceholderScreen
 
 private const val HOME_ROUTE = "home"
@@ -25,7 +27,14 @@ fun AppNavHost() {
             )
         }
         HomeDestination.entries.forEach { d ->
-            composable(d.route) { PlaceholderScreen(d.titleRes, onBack = { navController.popBackStack() }) }
+            composable(d.route) {
+                val back: () -> Unit = { navController.popBackStack() }
+                when (d) {
+                    HomeDestination.CONVERT_VIDEO, HomeDestination.EXTRACT_AUDIO ->
+                        PickInputScreen(PickKind.VIDEO, d.titleRes, back)
+                    else -> PlaceholderScreen(d.titleRes, back)
+                }
+            }
         }
     }
 }
