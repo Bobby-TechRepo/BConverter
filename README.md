@@ -23,5 +23,11 @@ MediaEngine interface + FakeMediaEngine, Hilt DI, Navigation, Home screen.
 Fixtures in `app/src/test/resources/ffprobe/` are hand-authored to ffprobe's documented JSON schema;
 replace/add real captures once the native integration test runs.
 
-## Open decision (blocks the real FfprobeRunner and Phase 5)
+## Phase 4 — Codec capability system (done)
+`VideoCodec`/`AudioCodec`, `ContainerCompatibility` (conservative container/codec table), `MediaCapabilityRepository`
+(spec §13) with `DefaultMediaCapabilityRepository` merging availability reports (OR), `MediaCodecCapabilitySource`
+(device MediaCodec) and `FfmpegCapabilities` (parses `ffmpeg -encoders/-decoders`; experimental encoders excluded).
+Not yet wired into DI/UI: it needs the FFmpeg runner to supply the FFmpeg report (Phase 5).
+
+## Open decision (blocks the real FfprobeRunner/FfmpegRunner and Phase 5)
 Which FFmpeg distribution to ship — see the project thread.
