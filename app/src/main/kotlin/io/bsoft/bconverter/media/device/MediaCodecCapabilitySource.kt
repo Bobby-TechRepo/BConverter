@@ -28,9 +28,10 @@ class MediaCodecCapabilitySource(private val provider: CodecInfoProvider) {
         val encoders = mutableSetOf<Codec>()
         val decoders = mutableSetOf<Codec>()
         for (info in provider.codecs()) {
+            val target = if (info.isEncoder) encoders else decoders
             for (mime in info.supportedTypes) {
                 val codec = CodecMimeTypes.toCodec(mime) ?: continue
-                (if (info.isEncoder) encoders else decoders) += codec
+                target.add(codec)
             }
         }
         return (encoders + decoders).map { CodecAvailability(it, canDecode = it in decoders, canEncode = it in encoders) }
