@@ -1,0 +1,15 @@
+{
+  "streams": [
+    {"index": 0, "codec_name": "h264", "profile": "High", "codec_type": "video", "width": 1920, "height": 1080,
+     "pix_fmt": "yuv420p", "level": 40, "r_frame_rate": "30/1", "avg_frame_rate": "30/1", "time_base": "1/15360",
+     "duration": "12.300000", "bit_rate": "4800000", "disposition": {"default": 1, "attached_pic": 0}},
+    {"index": 1, "codec_name": "aac", "profile": "LC", "codec_type": "audio", "sample_fmt": "fltp",
+     "sample_rate": "44100", "channels": 2, "channel_layout": "stereo", "r_frame_rate": "0/0", "avg_frame_rate": "0/0",
+     "duration": "12.345000", "bit_rate": "128000", "disposition": {"default": 1, "attached_pic": 0},
+     "tags": {"language": "und", "handler_name": "SoundHandler"}}
+  ],
+  "format": {"filename": "/data/user/0/io.bsoft.bconverter/cache/staging/x_holiday.mp4", "nb_streams": 2,
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2", "format_long_name": "QuickTime / MOV", "start_time": "0.000000",
+    "duration": "12.345000", "size": "7340032", "bit_rate": "4756000", "probe_score": 100,
+    "tags": {"major_brand": "isom", "minor_version": "512", "compatible_brands": "isomiso2avc1mp41"}}
+}
