@@ -109,15 +109,15 @@ class FfprobeJsonParserTest {
 
     // ---- frame rate ----
     @Test fun ntsc_fraction_is_converted() =
-        assertEquals(29.97, parsed(inline("mp4", streams = videoWith(""","avg_frame_rate":"30000/1001""")))
+        assertEquals(29.97, parsed(inline("mp4", streams = videoWith(",\"avg_frame_rate\":\"30000/1001\"")))
             .videoStreams.single().frameRate!!, 0.01)
 
     @Test fun zero_average_falls_back_to_r_frame_rate() =
-        assertEquals(25.0, parsed(inline("mp4", streams = videoWith(""","avg_frame_rate":"0/0","r_frame_rate":"25/1""")))
+        assertEquals(25.0, parsed(inline("mp4", streams = videoWith(",\"avg_frame_rate\":\"0/0\",\"r_frame_rate\":\"25/1\"")))
             .videoStreams.single().frameRate!!, 0.001)
 
     @Test fun no_valid_frame_rate_is_null() =
-        assertNull(parsed(inline("mp4", streams = videoWith(""","avg_frame_rate":"0/0","r_frame_rate":"0/0""")))
+        assertNull(parsed(inline("mp4", streams = videoWith(",\"avg_frame_rate\":\"0/0\",\"r_frame_rate\":\"0/0\"")))
             .videoStreams.single().frameRate)
 
     // ---- duration ----
@@ -132,7 +132,7 @@ class FfprobeJsonParserTest {
     // ---- tolerance ----
     @Test fun not_available_values_become_null() {
         val m = parsed(inline("mp4", formatExtra = ""","duration":"N/A","bit_rate":"N/A","size":"N/A"""",
-            streams = videoWith(""","bit_rate":"N/A""")))
+            streams = videoWith(",\"bit_rate\":\"N/A\"")))
         assertNull(m.bitrateBps); assertNull(m.sizeBytes); assertNull(m.videoStreams.single().bitrateBps)
         assertEquals(0L, m.durationMs)
     }
