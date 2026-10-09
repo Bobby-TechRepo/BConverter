@@ -17,5 +17,11 @@ MediaEngine interface + FakeMediaEngine, Hilt DI, Navigation, Home screen.
 `StagingDirectory` (sanitised names, stale cleanup), `AndroidContentReader`, SAF picker flow
 (`PickInputScreen`, wired to Convert Video / Extract Audio), typed `InputError`s with user-facing messages.
 
-## Next milestone
-Phase 3 — Media probing: FFprobe JSON fixtures -> `MediaMetadata` parser (tests first), then the real FFprobe integration.
+## Phase 3 — Media probing (parser done; native runner pending)
+`FfprobeJsonParser` (container/brand detection, rotation, cover-art exclusion, frame-rate and duration fallbacks,
+"N/A" tolerance), extended stream models, `MediaProber` (resolve -> ffprobe -> parse, releasing staged input on every failure path).
+Fixtures in `app/src/test/resources/ffprobe/` are hand-authored to ffprobe's documented JSON schema;
+replace/add real captures once the native integration test runs.
+
+## Open decision (blocks the real FfprobeRunner and Phase 5)
+Which FFmpeg distribution to ship — see the project thread.

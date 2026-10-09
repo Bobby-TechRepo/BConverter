@@ -70,7 +70,6 @@ class FfprobeJsonParserTest {
         assertEquals(listOf("aac", "ac3"), m.audioStreams.map { it.codec })
         assertEquals(6, m.audioStreams.first().channels)
         assertEquals(listOf("eng", null), m.subtitleStreams.map { it.language })
-        assertEquals(29.97, 24000.0 / 1001, 0.001)
         assertEquals(23.976, m.videoStreams.single().frameRate!!, 0.001)
     }
 
