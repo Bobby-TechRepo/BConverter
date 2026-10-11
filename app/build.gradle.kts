@@ -63,3 +63,11 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
+// Windows: the Android test runner keeps a lock file (utp.0.log.lck) open in the results directory, which Gradle
+// cannot hash when it fingerprints the task's outputs. Device tests are never up-to-date anyway, so skip tracking.
+tasks.configureEach {
+    if (name.startsWith("connected") && name.endsWith("AndroidTest")) {
+        doNotTrackState("Instrumented test results contain lock files that Gradle cannot hash on Windows")
+    }
+}
