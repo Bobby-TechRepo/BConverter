@@ -129,4 +129,10 @@ class ConversionRequestValidatorTest {
         val issues = check(video = encode(resolution = Resolution(1, 1).copy(width = 3), fps = 0.0))
         assertEquals(setOf<ConversionIssue>(ConversionIssue.InvalidResolution, ConversionIssue.InvalidFrameRate), issues.toSet())
     }
+
+    @Test fun crf_is_rejected_when_the_installed_encoder_is_bitrate_only() {
+        val v = ConversionRequestValidator(TestMedia.repoBitrateOnly(H264, AAC))
+        assertEquals(listOf(ConversionIssue.CrfNotSupported(H264)), check(v = v))
+        assertTrue(check(video = encode(VideoQuality.Bitrate(2000)), v = v).isEmpty())
+    }
 }

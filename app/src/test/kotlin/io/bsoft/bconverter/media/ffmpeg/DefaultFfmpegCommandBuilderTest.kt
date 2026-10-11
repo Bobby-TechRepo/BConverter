@@ -50,11 +50,10 @@ class DefaultFfmpegCommandBuilderTest {
         assertEquals(outFile.absolutePath, args.last())
     }
 
-    @Test fun global_options_overwrite_and_report_progress_on_stdout() {
+    @Test fun global_options_overwrite_but_leave_ffmpeg_stats_enabled_for_the_statistics_callback() {
         val g = build().globalOptions
         assertTrue("-y" in g); assertTrue("-hide_banner" in g)
-        assertEquals("pipe:1", g[g.indexOf("-progress") + 1])
-        assertTrue("-nostats" in g)
+        assertFalse("-nostats" in g); assertFalse("-progress" in g)
     }
 
     @Test fun argument_order_is_global_then_input_then_output_options_then_output_path() {

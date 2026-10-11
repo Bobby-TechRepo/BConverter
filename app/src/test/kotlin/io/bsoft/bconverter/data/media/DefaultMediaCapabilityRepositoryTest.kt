@@ -77,4 +77,20 @@ class DefaultMediaCapabilityRepositoryTest {
         val cap = repo(dec(HEVC)).getCapabilities().single { it.codec == HEVC }
         assertTrue(cap.canDecode); assertFalse(cap.canEncode)
     }
+
+    // ---- rate control ----
+    @Test fun crf_support_is_reported_per_codec() {
+        val r = DefaultMediaCapabilityRepository(listOf(CodecAvailability(H264, true, true, supportsCrf = true), CodecAvailability(HEVC, true, true)))
+        assertTrue(r.supportsCrf(H264)); assertFalse(r.supportsCrf(HEVC)); assertFalse(r.supportsCrf(VP9))
+    }
+
+    @Test fun crf_support_survives_merging_with_a_bitrate_only_report() {
+        val r = DefaultMediaCapabilityRepository(listOf(CodecAvailability(H264, true, true, true), CodecAvailability(H264, true, true, false)))
+        assertTrue(r.supportsCrf(H264))
+    }
+
+    @Test fun crf_support_requires_the_codec_to_be_encodable() {
+        val r = DefaultMediaCapabilityRepository(listOf(CodecAvailability(H264, canDecode = true, canEncode = false, supportsCrf = true)))
+        assertFalse(r.supportsCrf(H264))
+    }
 }

@@ -21,6 +21,13 @@ object TestMedia {
     fun metadata(video: VideoStream? = video(), audio: AudioStream? = audio()) =
         MediaMetadata(10_000, ContainerFormat.MP4, listOfNotNull(video), listOfNotNull(audio))
 
-    fun repo(vararg codecs: Codec) = DefaultMediaCapabilityRepository(codecs.map { CodecAvailability(it, true, true) })
+    private val CRF_CODECS = setOf<Codec>(VideoCodec.H264, VideoCodec.HEVC, VideoCodec.VP9, VideoCodec.AV1)
+
+    /** A build whose H.264/HEVC/VP9/AV1 encoders support CRF (e.g. libx264). */
+    fun repo(vararg codecs: Codec) =
+        DefaultMediaCapabilityRepository(codecs.map { CodecAvailability(it, true, true, supportsCrf = it in CRF_CODECS) })
+
+    /** A build whose encoders are bitrate-only (e.g. MediaCodec wrappers, Kvazaar). */
+    fun repoBitrateOnly(vararg codecs: Codec) = DefaultMediaCapabilityRepository(codecs.map { CodecAvailability(it, true, true) })
     fun allEncoders() = repo(*ALL.toTypedArray())
 }

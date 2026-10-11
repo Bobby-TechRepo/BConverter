@@ -100,4 +100,10 @@ class ConversionPresetFactoryTest {
 
     @Test fun missing_audio_encoder_for_a_source_with_audio_means_no_preset() =
         assertNull(ConversionPresetFactory(TestMedia.repo(H264)).create(ConversionPreset.BALANCED, source, MP4))
+
+    @Test fun bitrate_only_encoders_get_a_source_derived_bitrate_instead_of_crf() {
+        val f = ConversionPresetFactory(TestMedia.repoBitrateOnly(H264, AAC))
+        val s = f.create(ConversionPreset.BALANCED, source, MP4)!!
+        assertEquals(VideoQuality.Bitrate(3360), (s.video as VideoPlan.Encode).settings.quality)
+    }
 }

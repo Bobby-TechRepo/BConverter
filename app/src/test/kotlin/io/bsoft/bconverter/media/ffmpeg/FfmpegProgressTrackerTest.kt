@@ -59,4 +59,13 @@ class FfmpegProgressTrackerTest {
     @Test fun key_value_time_lines_are_not_mistaken_for_stats_lines() = assertNull(tracker().accept("out_time=00:00:02.500000"))
 
     @Test fun garbage_and_blank_lines_are_ignored() { assertNull(tracker().accept("")); assertNull(tracker().accept("Press [q] to stop")) }
+
+    // ---- statistics callback (FFmpegKit) ----
+    @Test fun statistics_callback_values_become_progress() =
+        assertEquals(MediaProcessingProgress(2500, 10_000, 0.25f, 2.0, 3750), tracker().onStatistics(2500, 2.0))
+
+    @Test fun statistics_with_no_valid_speed_or_negative_time_are_sanitised() {
+        assertEquals(MediaProcessingProgress(0, 10_000, 0.0f, null, null), tracker().onStatistics(-5, 0.0))
+        assertNull(tracker().onStatistics(1000, -1.0).speed)
+    }
 }
