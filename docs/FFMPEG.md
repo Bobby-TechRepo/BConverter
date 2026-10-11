@@ -9,6 +9,7 @@
 | ABI | `arm64-v8a` only (the fork publishes no other ABI) — emulators must be arm64 |
 | minSdk / targetSdk | 24+ (app uses 26) / 35 |
 | 16 KB pages | Enforced by the fork's CI |
+| Extra runtime dependency | `com.arthenica:smart-exception-java:0.2.1` — required by FFmpegKit, not declared by the fork's Maven POM (found via NoClassDefFoundError on device) |
 | Java API | Unchanged `com.arthenica.ffmpegkit` package; used via argument arrays, never shell strings |
 
 ## Libraries in `ffmpeg-kit-full` (per the fork's compatibility matrix)
