@@ -27,7 +27,7 @@ class CapabilityProviderTest {
 
     @Test fun repository_reflects_the_installed_encoders() = runTest {
         val repo = provider(software).repository()
-        assertEquals(listOf(VideoCodec.H264), repo.getVideoCodecs(ContainerFormat.MP4))
+        assertEquals(listOf(VideoCodec.H264, VideoCodec.VP9), repo.getVideoCodecs(ContainerFormat.MP4))
         assertTrue(ContainerFormat.WEBM in repo.getContainers())
     }
 
