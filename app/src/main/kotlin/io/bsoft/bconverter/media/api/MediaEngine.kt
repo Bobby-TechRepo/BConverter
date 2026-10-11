@@ -1,12 +1,21 @@
 package io.bsoft.bconverter.media.api
 
 import io.bsoft.bconverter.domain.model.MediaMetadata
+import io.bsoft.bconverter.domain.model.ConversionSettings
 import io.bsoft.bconverter.domain.model.MediaSource
+import io.bsoft.bconverter.domain.model.ResolvedInput
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 
 // Request/result types are intentionally minimal; later phases extend them test-first.
-data class ConversionRequest(val jobId: String, val source: MediaSource, val output: File)
+/** [input] must already be readable as a plain file (see InputResolver); [metadata] is its probe result. */
+data class ConversionRequest(
+    val jobId: String,
+    val input: ResolvedInput,
+    val metadata: MediaMetadata,
+    val outputFile: File,
+    val settings: ConversionSettings,
+)
 data class AudioExtractionRequest(val jobId: String, val source: MediaSource, val output: File)
 data class VideoProject(val id: String, val name: String)
 data class RenderOutput(val file: File)
@@ -15,6 +24,8 @@ data class Thumbnail(val positionMs: Long, val file: File)
 sealed interface MediaProcessingResult {
     data class Success(val output: File) : MediaProcessingResult
     data class Failure(val message: String) : MediaProcessingResult
+    /** Returned by an engine after [MediaEngine.cancel]; the output is incomplete and must be discarded. */
+    data object Cancelled : MediaProcessingResult
 }
 
 data class MediaProcessingProgress(

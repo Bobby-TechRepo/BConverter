@@ -29,5 +29,12 @@ replace/add real captures once the native integration test runs.
 (device MediaCodec) and `FfmpegCapabilities` (parses `ffmpeg -encoders/-decoders`; experimental encoders excluded).
 Not yet wired into DI/UI: it needs the FFmpeg runner to supply the FFmpeg report (Phase 5).
 
-## Open decision (blocks the real FfprobeRunner/FfmpegRunner and Phase 5)
+## Phase 5a — Conversion logic (done; native execution pending)
+`ConversionSettings` model (stream copy / encode plans, CRF or bitrate), `ConversionPresetFactory`
+(Small/Balanced/High/Original — see table in its KDoc), `ConversionRequestValidator` (reports all issues),
+structured `DefaultFfmpegCommandBuilder` (+ `EncoderNames` overridable per build), `FfmpegProgressTracker`
+(`-progress` blocks and classic status lines), `ConversionSession` (state machine, cancellation, cleanup).
+Not yet done: converter screens/ViewModel, real FFmpeg execution, integration tests (need the distribution decision).
+
+## Open decision (blocks the real FfprobeRunner/FfmpegRunner and Phase 5b)
 Which FFmpeg distribution to ship — see the project thread.
