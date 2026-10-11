@@ -46,8 +46,10 @@ class ConversionRequestValidator(private val capabilities: MediaCapabilityReposi
                     }
                     is VideoQuality.Bitrate -> if (q.kbps !in 1..MAX_VIDEO_KBPS) add(ConversionIssue.InvalidVideoBitrate)
                 }
-                s.resolution?.let { if (!isValid(it)) add(ConversionIssue.InvalidResolution) }
-                s.frameRate?.let { if (!(it.isFinite() && it > 0 && it <= MAX_FPS)) add(ConversionIssue.InvalidFrameRate) }
+                val resolution = s.resolution
+                if (resolution != null && !isValid(resolution)) add(ConversionIssue.InvalidResolution)
+                val fps = s.frameRate
+                if (fps != null && !(fps.isFinite() && fps > 0 && fps <= MAX_FPS)) add(ConversionIssue.InvalidFrameRate)
             }
         }
     }
@@ -68,14 +70,17 @@ class ConversionRequestValidator(private val capabilities: MediaCapabilityReposi
                 val s = plan.settings
                 checkCodec(s.codec, settings.container, ContainerCompatibility.audioCodecs(settings.container),
                     capabilities.getAudioCodecs(settings.container))
-                s.bitrateKbps?.let {
+                val kbps = s.bitrateKbps
+                if (kbps != null) {
                     if (s.codec in LOSSLESS) add(ConversionIssue.AudioBitrateNotAllowed(s.codec))
-                    else if (it !in AUDIO_KBPS) add(ConversionIssue.InvalidAudioBitrate)
+                    else if (kbps !in AUDIO_KBPS) add(ConversionIssue.InvalidAudioBitrate)
                 }
-                s.sampleRateHz?.let { if (it !in SAMPLE_RATES) add(ConversionIssue.InvalidSampleRate) }
-                s.channels?.let {
+                val rate = s.sampleRateHz
+                if (rate != null && rate !in SAMPLE_RATES) add(ConversionIssue.InvalidSampleRate)
+                val channels = s.channels
+                if (channels != null) {
                     val max = if (s.codec == AudioCodec.MP3) 2 else 8
-                    if (it !in 1..max) add(ConversionIssue.InvalidChannels(s.codec))
+                    if (channels !in 1..max) add(ConversionIssue.InvalidChannels(s.codec))
                 }
             }
         }
