@@ -36,12 +36,15 @@ class ConversionRequestValidator(private val capabilities: MediaCapabilityReposi
             }
             is VideoPlan.Encode -> {
                 val s = plan.settings
-                checkCodec(s.codec, settings.container, ContainerCompatibility.videoCodecs(settings.container),
-                    capabilities.getVideoCodecs(settings.container))
+                val encodable = capabilities.getVideoCodecs(settings.container)
+                checkCodec(s.codec, settings.container, ContainerCompatibility.videoCodecs(settings.container), encodable)
                 when (val q = s.quality) {
                     is VideoQuality.Crf -> {
                         val range = s.codec.crfRange()
-                        if (range == null || !capabilities.supportsCrf(s.codec)) add(ConversionIssue.CrfNotSupported(s.codec))
+                        // Encoder-level CRF support is only meaningful for a codec that is usable at all;
+                        // otherwise the codec/encoder issue above is the real problem.
+                        val encoderLacksCrf = s.codec in encodable && !capabilities.supportsCrf(s.codec)
+                        if (range == null || encoderLacksCrf) add(ConversionIssue.CrfNotSupported(s.codec))
                         else if (q.value !in range) add(ConversionIssue.CrfOutOfRange(s.codec, range.first, range.last))
                     }
                     is VideoQuality.Bitrate -> if (q.kbps !in 1..MAX_VIDEO_KBPS) add(ConversionIssue.InvalidVideoBitrate)

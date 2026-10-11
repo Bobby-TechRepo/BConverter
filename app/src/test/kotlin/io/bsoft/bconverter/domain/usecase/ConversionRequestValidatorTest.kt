@@ -135,4 +135,9 @@ class ConversionRequestValidatorTest {
         assertEquals(listOf(ConversionIssue.CrfNotSupported(H264)), check(v = v))
         assertTrue(check(video = encode(VideoQuality.Bitrate(2000)), v = v).isEmpty())
     }
+
+    @Test fun a_codec_that_is_not_usable_does_not_also_trigger_a_crf_complaint() {
+        val v = ConversionRequestValidator(TestMedia.repoBitrateOnly(H264, OPUS))
+        assertEquals(listOf(ConversionIssue.CodecNotAllowedInContainer(H264, WEBM)), check(container = WEBM, audio = aac(codec = OPUS), v = v))
+    }
 }
