@@ -18,4 +18,7 @@ interface MediaCapabilityRepository {
      * A null codec means "no such stream"; both null is never compatible.
      */
     fun isCompatible(container: ContainerFormat, videoCodec: VideoCodec?, audioCodec: AudioCodec?): Boolean
+
+    /** Whether the installed encoder for [codec] accepts CRF; otherwise quality must be set as a bitrate. */
+    fun supportsCrf(codec: VideoCodec): Boolean
 }

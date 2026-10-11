@@ -41,7 +41,7 @@ class ConversionRequestValidator(private val capabilities: MediaCapabilityReposi
                 when (val q = s.quality) {
                     is VideoQuality.Crf -> {
                         val range = s.codec.crfRange()
-                        if (range == null) add(ConversionIssue.CrfNotSupported(s.codec))
+                        if (range == null || !capabilities.supportsCrf(s.codec)) add(ConversionIssue.CrfNotSupported(s.codec))
                         else if (q.value !in range) add(ConversionIssue.CrfOutOfRange(s.codec, range.first, range.last))
                     }
                     is VideoQuality.Bitrate -> if (q.kbps !in 1..MAX_VIDEO_KBPS) add(ConversionIssue.InvalidVideoBitrate)

@@ -36,5 +36,11 @@ structured `DefaultFfmpegCommandBuilder` (+ `EncoderNames` overridable per build
 (`-progress` blocks and classic status lines), `ConversionSession` (state machine, cancellation, cleanup).
 Not yet done: converter screens/ViewModel, real FFmpeg execution, integration tests (need the distribution decision).
 
-## Open decision (blocks the real FfprobeRunner/FfmpegRunner and Phase 5b)
-Which FFmpeg distribution to ship — see the project thread.
+## FFmpeg decision (resolved)
+FFmpegKit community fork, free LGPL artifact `ffmpeg-kit-full:8.1.7` — details, licensing and caveats in `docs/FFMPEG.md`.
+arm64-v8a only: run instrumented/native tests on an arm64 device or emulator.
+
+## Phase 5b — Real engine (done, needs device verification)
+`FfmpegMediaEngine` (probe, convert with progress, cancel), `CapabilityProvider` (runtime encoder discovery, CRF awareness,
+MediaCodec cross-check), real `FfmpegKit*` glue and Hilt `MediaModule`. Run `connectedDebugAndroidTest` on arm64.
+Next: converter screens/ViewModel (pick -> probe -> preset -> validate -> convert), then Phase 6 (audio extraction).

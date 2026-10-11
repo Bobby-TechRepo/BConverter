@@ -60,7 +60,8 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
         if (settings.container in FASTSTART_CONTAINERS) o += "-movflags" to "+faststart"
 
         return FfmpegCommand(
-            globalOptions = listOf("-y", "-hide_banner", "-nostats", "-progress", "pipe:1"),
+            // Stats stay enabled (no -nostats): FFmpegKit's statistics callback is fed from ffmpeg's progress reporting.
+            globalOptions = listOf("-y", "-hide_banner"),
             inputs = listOf(FfmpegInput(request.input.file.absolutePath)),
             output = FfmpegOutput(request.outputFile.absolutePath, FfmpegOptions(o)),
         )

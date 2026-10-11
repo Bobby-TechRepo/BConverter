@@ -12,10 +12,17 @@ import io.bsoft.bconverter.domain.repository.MediaCapabilityRepository
 /** Snapshot repository: availability reports from any number of sources are merged with OR semantics. */
 class DefaultMediaCapabilityRepository(availability: List<CodecAvailability>) : MediaCapabilityRepository {
     private val byCodec: Map<Codec, CodecAvailability> = availability.groupBy { it.codec }.mapValues { (codec, reports) ->
-        CodecAvailability(codec, canDecode = reports.any { it.canDecode }, canEncode = reports.any { it.canEncode })
+        CodecAvailability(
+            codec,
+            canDecode = reports.any { it.canDecode },
+            canEncode = reports.any { it.canEncode },
+            supportsCrf = reports.any { it.supportsCrf },
+        )
     }
 
     private fun canEncode(codec: Codec) = byCodec[codec]?.canEncode == true
+
+    override fun supportsCrf(codec: VideoCodec): Boolean = byCodec[codec]?.let { it.canEncode && it.supportsCrf } == true
 
     override fun getContainers(): List<ContainerFormat> =
         ContainerFormat.entries.filter { c -> ContainerCompatibility.videoCodecs(c).any { canEncode(it) } }

@@ -46,7 +46,7 @@ class ConversionPresetFactory(private val capabilities: MediaCapabilityRepositor
         }
         val available = capabilities.getVideoCodecs(container)
         val codec = VIDEO_PREFERENCE.firstOrNull { it in available } ?: return null
-        val quality = if (codec.crfRange() != null) {
+        val quality = if (codec.crfRange() != null && capabilities.supportsCrf(codec)) {
             VideoQuality.Crf(crf(preset))
         } else {
             VideoQuality.Bitrate(bitrateKbps(preset, stream))

@@ -3,6 +3,7 @@ package io.bsoft.bconverter.media.api
 import io.bsoft.bconverter.domain.model.MediaMetadata
 import io.bsoft.bconverter.domain.model.ConversionSettings
 import io.bsoft.bconverter.domain.model.MediaSource
+import io.bsoft.bconverter.domain.model.ProbeFailure
 import io.bsoft.bconverter.domain.model.ResolvedInput
 import java.io.File
 import kotlinx.coroutines.flow.Flow
@@ -35,6 +36,9 @@ data class MediaProcessingProgress(
     val speed: Double?,
     val estimatedRemainingMs: Long?,
 )
+
+/** Thrown by [MediaEngine.probe] when the file cannot be probed; [failure] says why. */
+class MediaEngineException(val failure: ProbeFailure) : Exception("Media probing failed: $failure")
 
 /** The only seam between the app and FFmpeg/FFprobe (spec §9). No FFmpeg types here. */
 interface MediaEngine {

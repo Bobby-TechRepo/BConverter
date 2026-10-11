@@ -34,6 +34,13 @@ class FfmpegProgressTracker(private val totalDurationMs: Long?) {
         return null
     }
 
+    /** For FFmpegKit's statistics callback (time in ms, speed as a multiplier). */
+    fun onStatistics(processedMs: Long, speed: Double?): MediaProcessingProgress {
+        this.processedMs = processedMs.coerceAtLeast(0)
+        this.speed = speed?.takeIf { it > 0 }
+        return snapshot(done = false)
+    }
+
     private fun parseSpeed(raw: String): Double? = raw.removeSuffix("x").trim().toDoubleOrNull()?.takeIf { it > 0 }
 
     private fun snapshot(done: Boolean): MediaProcessingProgress {

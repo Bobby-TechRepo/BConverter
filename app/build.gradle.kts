@@ -17,6 +17,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The FFmpegKit fork publishes arm64-v8a only (see docs/FFMPEG.md).
+        ndk { abiFilters += "arm64-v8a" }
     }
     buildTypes {
         release {
@@ -43,6 +45,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.ffmpeg.kit.full)
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
