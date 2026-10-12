@@ -137,4 +137,18 @@ class ConversionSessionTest {
         try { session.reset(); fail("expected IllegalStateException") } catch (_: IllegalStateException) {}
         engine.convertGate!!.complete(MediaProcessingResult.Success(output)); job.join()
     }
+
+    @Test fun the_input_can_be_kept_by_the_caller() = runTest {
+        session.run(request, releaseInput = false)
+        assertTrue(resolver.released.isEmpty())
+    }
+
+    @Test fun a_kept_input_is_also_not_released_on_failure_or_cancellation() = runTest {
+        engine.processingResult = MediaProcessingResult.Failure("x")
+        session.run(request, releaseInput = false); session.reset()
+        engine.convertGate = CompletableDeferred()
+        val job = launch { session.run(request, releaseInput = false) }; runCurrent()
+        session.cancel(); job.join()
+        assertTrue(resolver.released.isEmpty())
+    }
 }

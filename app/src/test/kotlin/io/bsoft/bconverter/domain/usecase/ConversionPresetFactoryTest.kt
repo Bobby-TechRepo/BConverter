@@ -106,4 +106,28 @@ class ConversionPresetFactoryTest {
         val s = f.create(ConversionPreset.BALANCED, source, MP4)!!
         assertEquals(VideoQuality.Bitrate(3360), (s.video as VideoPlan.Encode).settings.quality)
     }
+
+    // ---- user-chosen codecs ----
+    @Test fun a_chosen_video_codec_is_used_with_the_preset_quality() {
+        val s = factory.create(ConversionPreset.BALANCED, source, MP4, videoCodec = HEVC)!!
+        assertEquals(video(VideoSettings(HEVC, VideoQuality.Crf(23))), s.video)
+    }
+
+    @Test fun a_chosen_audio_codec_is_used_with_the_preset_bitrate() {
+        val s = factory.create(ConversionPreset.BALANCED, source, MP4, audioCodec = MP3)!!
+        assertEquals(audio(AudioSettings(MP3, bitrateKbps = 128)), s.audio)
+    }
+
+    @Test fun choosing_a_video_codec_disables_video_copy_but_not_audio_copy() {
+        val s = factory.create(ConversionPreset.ORIGINAL_QUALITY, source, MKV, videoCodec = H264)!!
+        assertEquals(video(VideoSettings(H264, VideoQuality.Crf(16))), s.video); assertEquals(AudioPlan.Copy, s.audio)
+    }
+
+    @Test fun a_chosen_codec_the_container_cannot_hold_gives_no_preset() {
+        assertNull(factory.create(ConversionPreset.BALANCED, source, WEBM, videoCodec = H264))
+        assertNull(factory.create(ConversionPreset.BALANCED, source, WEBM, audioCodec = AAC))
+    }
+
+    @Test fun a_chosen_codec_without_an_encoder_gives_no_preset() =
+        assertNull(ConversionPresetFactory(TestMedia.repo(H264, AAC)).create(ConversionPreset.BALANCED, source, MP4, videoCodec = HEVC))
 }

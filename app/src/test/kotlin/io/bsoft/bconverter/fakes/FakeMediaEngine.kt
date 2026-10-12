@@ -16,6 +16,9 @@ class FakeMediaEngine : MediaEngine {
     var convertGate: CompletableDeferred<MediaProcessingResult>? = null
     var convertError: Throwable? = null
 
+    /** Lets a test simulate FFmpeg writing the output file. */
+    var onConvert: ((ConversionRequest) -> Unit)? = null
+
     val probedSources = mutableListOf<MediaSource>()
     val converted = mutableListOf<ConversionRequest>()
     val cancelledJobIds = mutableListOf<String>()
@@ -29,6 +32,7 @@ class FakeMediaEngine : MediaEngine {
     override suspend fun probe(source: MediaSource): MediaMetadata { probedSources += source; return probeResult }
     override suspend fun convert(request: ConversionRequest): MediaProcessingResult {
         converted += request
+        onConvert?.invoke(request)
         convertError?.let { throw it }
         return convertGate?.await() ?: processingResult
     }
