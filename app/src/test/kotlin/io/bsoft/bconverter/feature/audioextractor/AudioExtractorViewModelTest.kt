@@ -19,17 +19,25 @@ import io.bsoft.bconverter.domain.repository.PublishResult
 import io.bsoft.bconverter.feature.converter.ConverterEvent
 import io.bsoft.bconverter.feature.converter.ConverterMessage
 import io.bsoft.bconverter.feature.converter.ConverterStage
+import io.bsoft.bconverter.fakes.DirectExportScheduler
 import io.bsoft.bconverter.fakes.FakeCapabilitySource
+import io.bsoft.bconverter.fakes.FakeFreeSpaceProvider
 import io.bsoft.bconverter.fakes.FakeFfprobeRunner
 import io.bsoft.bconverter.fakes.FakeInputResolver
 import io.bsoft.bconverter.fakes.FakeMediaEngine
 import io.bsoft.bconverter.fakes.FakeOutputPublisher
 import io.bsoft.bconverter.fakes.TestMedia
+import io.bsoft.bconverter.domain.usecase.ExportJobExecutor
+import io.bsoft.bconverter.domain.usecase.ExportJobLauncher
+import io.bsoft.bconverter.domain.usecase.ExportRegistry
+import io.bsoft.bconverter.domain.usecase.StorageGuard
 import io.bsoft.bconverter.media.api.MediaProcessingProgress
 import io.bsoft.bconverter.media.api.MediaProcessingResult
 import io.bsoft.bconverter.media.ffmpeg.FfprobeRunResult
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -61,6 +69,9 @@ class AudioExtractorViewModelTest {
     private val engine = FakeMediaEngine()
     private val capabilities = FakeCapabilitySource()
     private val publisher = FakeOutputPublisher()
+    private val free = FakeFreeSpaceProvider()
+    private val registry = ExportRegistry()
+    private val scope = CoroutineScope(dispatcher)
     private lateinit var staging: StagingDirectory
     private lateinit var staged: ResolvedInput
     private val uri: Uri = Uri.parse("content://x/1")
@@ -76,9 +87,12 @@ class AudioExtractorViewModelTest {
         resolver.result = ResolveResult.Success(staged)
         runner.result = FfprobeRunResult.Success(json("mp4_h264_aac.json"))
     }
-    @After fun tearDown() { Dispatchers.resetMain() }
+    @After fun tearDown() { scope.cancel(); Dispatchers.resetMain() }
 
-    private fun vm() = AudioExtractorViewModel(MediaProber(resolver, runner), capabilities, engine, resolver, staging, publisher)
+    private fun vm() = AudioExtractorViewModel(
+        MediaProber(resolver, runner), capabilities, resolver, staging, StorageGuard(free, staging),
+        ExportJobLauncher(registry, DirectExportScheduler(scope, ExportJobExecutor(engine, resolver, publisher, registry))),
+    )
     private fun TestScope.opened(): AudioExtractorViewModel = vm().also { it.onInputPicked(uri); runCurrent() }
     private fun TestScope.extracting(vm: AudioExtractorViewModel) { vm.onStartRequested(); vm.onDestinationChosen(destination); runCurrent() }
 
@@ -257,5 +271,28 @@ class AudioExtractorViewModelTest {
         })[AudioExtractorViewModel::class.java]
         store.clear()
         assertEquals(listOf(staged), resolver.released)
+    }
+
+    // ---- storage preflight ----
+    @Test fun an_extraction_that_cannot_fit_is_blocked_with_a_storage_issue() = runTest(dispatcher) {
+        free.available = 1
+        val events = mutableListOf<ConverterEvent>()
+        val vm = opened(); backgroundScope.launch { vm.events.collect { events += it } }
+        vm.onStartRequested(); runCurrent()
+        assertTrue(vm.state.value.issues.any { it is ConversionIssue.InsufficientStorage }); assertTrue(events.isEmpty())
+    }
+
+    // ---- jobs outlive the screen ----
+    @Test fun leaving_the_screen_mid_extraction_lets_the_job_finish_and_release_the_input() = runTest(dispatcher) {
+        engine.convertGate = CompletableDeferred(); engine.onExtract = { it.outputFile.writeText("a") }
+        val vm = opened(); extracting(vm)
+        val store = ViewModelStore()
+        ViewModelProvider(store, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = vm as T
+        })[AudioExtractorViewModel::class.java]
+        store.clear()
+        assertTrue(registry.isDetached(engine.extracted.single().jobId)); assertTrue(resolver.released.isEmpty())
+        engine.convertGate!!.complete(MediaProcessingResult.Success(File("x"))); runCurrent()
+        assertEquals(listOf(staged), resolver.released); assertEquals(1, publisher.published.size)
     }
 }

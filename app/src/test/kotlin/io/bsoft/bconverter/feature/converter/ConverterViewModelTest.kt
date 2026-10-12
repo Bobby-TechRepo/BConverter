@@ -20,16 +20,24 @@ import io.bsoft.bconverter.domain.model.VideoCodec
 import io.bsoft.bconverter.domain.model.VideoPlan
 import io.bsoft.bconverter.domain.model.VideoQuality
 import io.bsoft.bconverter.domain.repository.PublishResult
+import io.bsoft.bconverter.fakes.DirectExportScheduler
 import io.bsoft.bconverter.fakes.FakeCapabilitySource
+import io.bsoft.bconverter.fakes.FakeFreeSpaceProvider
 import io.bsoft.bconverter.fakes.FakeFfprobeRunner
 import io.bsoft.bconverter.fakes.FakeInputResolver
 import io.bsoft.bconverter.fakes.FakeMediaEngine
 import io.bsoft.bconverter.fakes.FakeOutputPublisher
+import io.bsoft.bconverter.domain.usecase.ExportJobExecutor
+import io.bsoft.bconverter.domain.usecase.ExportJobLauncher
+import io.bsoft.bconverter.domain.usecase.ExportRegistry
+import io.bsoft.bconverter.domain.usecase.StorageGuard
 import io.bsoft.bconverter.media.api.MediaProcessingProgress
 import io.bsoft.bconverter.media.api.MediaProcessingResult
 import io.bsoft.bconverter.media.ffmpeg.FfprobeRunResult
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -61,6 +69,9 @@ class ConverterViewModelTest {
     private val engine = FakeMediaEngine()
     private val capabilities = FakeCapabilitySource()
     private val publisher = FakeOutputPublisher()
+    private val free = FakeFreeSpaceProvider()
+    private val registry = ExportRegistry()
+    private val scope = CoroutineScope(dispatcher)
     private lateinit var staging: StagingDirectory
     private lateinit var staged: ResolvedInput
     private val uri: Uri = Uri.parse("content://x/1")
@@ -74,9 +85,12 @@ class ConverterViewModelTest {
         resolver.result = ResolveResult.Success(staged)
         runner.result = FfprobeRunResult.Success(json("mp4_h264_aac.json"))
     }
-    @After fun tearDown() { Dispatchers.resetMain() }
+    @After fun tearDown() { scope.cancel(); Dispatchers.resetMain() }
 
-    private fun vm() = ConverterViewModel(MediaProber(resolver, runner), capabilities, engine, resolver, staging, publisher)
+    private fun vm() = ConverterViewModel(
+        MediaProber(resolver, runner), capabilities, resolver, staging, StorageGuard(free, staging),
+        ExportJobLauncher(registry, DirectExportScheduler(scope, ExportJobExecutor(engine, resolver, publisher, registry))),
+    )
     private fun TestScope.opened(): ConverterViewModel = vm().also { it.onInputPicked(uri); runCurrent() }
     private fun ConverterViewModel.video() = (state.value.settings!!.video as VideoPlan.Encode).settings
     private fun ConverterViewModel.audio() = (state.value.settings!!.audio as AudioPlan.Encode).settings
@@ -268,5 +282,36 @@ class ConverterViewModelTest {
         })[ConverterViewModel::class.java]
         store.clear()
         assertEquals(listOf(staged), resolver.released)
+    }
+
+    // ---- storage preflight ----
+    @Test fun a_conversion_that_cannot_fit_is_blocked_with_a_storage_issue() = runTest(dispatcher) {
+        free.available = 1
+        val events = mutableListOf<ConverterEvent>()
+        val vm = opened(); backgroundScope.launch { vm.events.collect { events += it } }
+        vm.onStartRequested(); runCurrent()
+        assertTrue(vm.state.value.issues.any { it is ConversionIssue.InsufficientStorage }); assertTrue(events.isEmpty())
+    }
+
+    // ---- jobs outlive the screen ----
+    @Test fun leaving_the_screen_mid_conversion_lets_the_job_finish_and_release_the_input() = runTest(dispatcher) {
+        engine.convertGate = CompletableDeferred(); engine.onConvert = { it.outputFile.writeText("c") }
+        val vm = opened(); converting(vm)
+        val store = ViewModelStore()
+        ViewModelProvider(store, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = vm as T
+        })[ConverterViewModel::class.java]
+        store.clear()
+        assertTrue(registry.isDetached(engine.converted.single().jobId)); assertTrue(resolver.released.isEmpty())
+        engine.convertGate!!.complete(MediaProcessingResult.Success(File("x"))); runCurrent()
+        assertEquals(listOf(staged), resolver.released); assertEquals(1, publisher.published.size)
+    }
+
+    @Test fun the_job_is_handed_to_the_scheduler_under_its_own_id() = runTest(dispatcher) {
+        engine.convertGate = CompletableDeferred()
+        val vm = opened(); converting(vm)
+        assertEquals(engine.converted.single().jobId, registry.job(engine.converted.single().jobId)!!.id)
+        assertEquals("holiday.mp4", registry.job(engine.converted.single().jobId)!!.title)
+        engine.convertGate!!.complete(MediaProcessingResult.Success(File("x"))); runCurrent()
     }
 }
