@@ -164,7 +164,7 @@ class ConversionSessionTest {
     @Test fun an_extraction_completes_and_releases_the_input() = runTest {
         session.runExtraction(extraction())
         assertEquals(ProcessingState.Completed, session.state.value)
-        assertEquals(listOf(extraction().copy(jobId = "job-2")).size, engine.extracted.size); assertEquals(listOf(input), resolver.released)
+        assertEquals(1, engine.extracted.size); assertEquals(listOf(input), resolver.released)
     }
 
     @Test fun a_failed_extraction_removes_the_partial_output() = runTest {
