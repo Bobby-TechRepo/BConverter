@@ -1,5 +1,6 @@
 package io.bsoft.bconverter.media.ffmpeg
 
+import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
 
 /** Ordered option list, so tests can assert on structure instead of fragile strings. */
@@ -27,4 +28,6 @@ data class FfmpegCommand(
 /** Spec §30. `buildRenderCommand(project)` is added in Phase 12 together with the render pipeline. */
 interface FfmpegCommandBuilder {
     fun buildConversionCommand(request: ConversionRequest): FfmpegCommand
+
+    fun buildAudioExtractionCommand(request: AudioExtractionRequest): FfmpegCommand
 }

@@ -63,4 +63,5 @@ sealed interface ConversionIssue {
     data object InvalidSampleRate : ConversionIssue
     data class InvalidChannels(val codec: AudioCodec) : ConversionIssue
     data object InvalidOutputName : ConversionIssue
+    data object InvalidAudioStream : ConversionIssue
 }

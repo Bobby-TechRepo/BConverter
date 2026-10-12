@@ -22,6 +22,8 @@ class DefaultMediaCapabilityRepository(availability: List<CodecAvailability>) : 
 
     private fun canEncode(codec: Codec) = byCodec[codec]?.canEncode == true
 
+    override fun canEncodeAudio(codec: AudioCodec): Boolean = canEncode(codec)
+
     override fun supportsCrf(codec: VideoCodec): Boolean = byCodec[codec]?.let { it.canEncode && it.supportsCrf } == true
 
     override fun getContainers(): List<ContainerFormat> =

@@ -138,6 +138,7 @@ fun ConverterContent(state: ConverterUiState, actions: ConverterActions, modifie
                     Spacer(Modifier.height(16.dp))
                     OutlinedButton(onClick = actions.onCancel) { Text(stringResource(R.string.converter_cancel)) }
                 }
+                ConverterStage.Extracting -> Unit // only used by the audio extractor
                 ConverterStage.Completed -> Centered {
                     Text(stringResource(R.string.converter_saved), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     Spacer(Modifier.height(16.dp))
@@ -149,7 +150,7 @@ fun ConverterContent(state: ConverterUiState, actions: ConverterActions, modifie
 }
 
 @Composable
-private fun Centered(content: @Composable () -> Unit) {
+internal fun Centered(content: @Composable () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -223,7 +224,7 @@ private fun ConfigureForm(state: ConverterUiState, actions: ConverterActions) {
 }
 
 @Composable
-private fun SourceCard(source: SourceInfo) {
+internal fun SourceCard(source: SourceInfo) {
     val context = LocalContext.current
     val unknown = stringResource(R.string.converter_unknown)
     val m = source.metadata
@@ -243,7 +244,7 @@ private fun SourceCard(source: SourceInfo) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun <T> Dropdown(label: String, selectedText: String, options: List<Pair<String, T>>, onSelect: (T) -> Unit) {
+internal fun <T> Dropdown(label: String, selectedText: String, options: List<Pair<String, T>>, onSelect: (T) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
@@ -263,12 +264,13 @@ private fun <T> Dropdown(label: String, selectedText: String, options: List<Pair
 }
 
 @Composable
-private fun MessageText(message: ConverterMessage) {
+internal fun MessageText(message: ConverterMessage) {
     Text(
         text = when (message) {
             is ConverterMessage.InputProblem -> inputErrorMessage(message.error)
             ConverterMessage.ProbeFailed -> stringResource(R.string.msg_probe_failed)
             ConverterMessage.NoVideoStream -> stringResource(R.string.msg_no_video)
+            ConverterMessage.NoAudioStream -> stringResource(R.string.msg_no_audio)
             ConverterMessage.NoEncodersAvailable -> stringResource(R.string.msg_no_encoders)
             ConverterMessage.ConversionFailed -> stringResource(R.string.msg_conversion_failed)
             ConverterMessage.SaveFailed -> stringResource(R.string.msg_save_failed)
@@ -287,7 +289,7 @@ private fun ConversionPreset.labelRes(): Int = when (this) {
 }
 
 @StringRes
-private fun ConversionIssue.messageRes(): Int = when (this) {
+internal fun ConversionIssue.messageRes(): Int = when (this) {
     ConversionIssue.SourceHasNoVideo -> R.string.issue_no_video
     ConversionIssue.SourceHasNoAudio -> R.string.issue_no_audio
     is ConversionIssue.CodecNotAllowedInContainer -> R.string.issue_codec_container
@@ -304,4 +306,5 @@ private fun ConversionIssue.messageRes(): Int = when (this) {
     ConversionIssue.InvalidSampleRate -> R.string.issue_sample_rate
     is ConversionIssue.InvalidChannels -> R.string.issue_channels
     ConversionIssue.InvalidOutputName -> R.string.issue_output_name
+    ConversionIssue.InvalidAudioStream -> R.string.issue_audio_stream
 }

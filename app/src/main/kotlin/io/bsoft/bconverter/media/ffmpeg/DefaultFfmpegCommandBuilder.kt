@@ -1,12 +1,15 @@
 package io.bsoft.bconverter.media.ffmpeg
 
 import io.bsoft.bconverter.domain.model.AudioCodec
+import io.bsoft.bconverter.domain.model.AudioExtractionMode
+import io.bsoft.bconverter.domain.model.AudioFormat
 import io.bsoft.bconverter.domain.model.AudioPlan
 import io.bsoft.bconverter.domain.model.ContainerFormat
 import io.bsoft.bconverter.domain.model.VideoCodec
 import io.bsoft.bconverter.domain.model.VideoPlan
 import io.bsoft.bconverter.domain.model.VideoQuality
 import io.bsoft.bconverter.domain.model.VideoSettings
+import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -65,6 +68,40 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
             inputs = listOf(FfmpegInput(request.input.file.absolutePath)),
             output = FfmpegOutput(request.outputFile.absolutePath, FfmpegOptions(o)),
         )
+    }
+
+    override fun buildAudioExtractionCommand(request: AudioExtractionRequest): FfmpegCommand {
+        val s = request.settings
+        val o = mutableListOf<Pair<String, String?>>()
+        o += "-f" to audioFormatName(s.format)
+        o += "-map" to "0:a:${s.streamOrdinal}"
+        o += "-vn" to null
+        o += "-sn" to null
+        o += "-dn" to null
+        o += "-map_metadata" to "0" // keep title/artist/etc.
+        when (val mode = s.mode) {
+            AudioExtractionMode.Copy -> o += "-c:a" to "copy"
+            is AudioExtractionMode.Encode -> {
+                o += "-c:a" to requireNotNull(encoders.audio[s.format.codec]) { "No encoder name for ${s.format.codec}" }
+                mode.bitrateKbps?.let { o += "-b:a" to "${it}k" }
+                mode.sampleRateHz?.let { o += "-ar" to it.toString() }
+                mode.channels?.let { o += "-ac" to it.toString() }
+            }
+        }
+        return FfmpegCommand(
+            globalOptions = listOf("-y", "-hide_banner"),
+            inputs = listOf(FfmpegInput(request.input.file.absolutePath)),
+            output = FfmpegOutput(request.outputFile.absolutePath, FfmpegOptions(o)),
+        )
+    }
+
+    private fun audioFormatName(f: AudioFormat) = when (f) {
+        AudioFormat.MP3 -> "mp3"
+        AudioFormat.AAC -> "adts"
+        AudioFormat.M4A -> "ipod"
+        AudioFormat.FLAC -> "flac"
+        AudioFormat.WAV -> "wav"
+        AudioFormat.OPUS -> "opus"
     }
 
     private fun videoOptions(o: MutableList<Pair<String, String?>>, s: VideoSettings, container: ContainerFormat) {

@@ -1,6 +1,7 @@
 package io.bsoft.bconverter.feature.converter
 
 import io.bsoft.bconverter.domain.model.AudioCodec
+import io.bsoft.bconverter.domain.model.AudioFormat
 import io.bsoft.bconverter.domain.model.ContainerFormat
 import io.bsoft.bconverter.domain.model.VideoCodec
 import java.util.Locale
@@ -42,4 +43,13 @@ val ContainerFormat.displayName: String get() = when (this) {
     ContainerFormat.MOV -> "MOV"
     ContainerFormat.AVI -> "AVI"
     ContainerFormat.MPEG_TS -> "MPEG-TS"
+}
+
+val AudioFormat.displayName: String get() = when (this) {
+    AudioFormat.MP3 -> "MP3"
+    AudioFormat.AAC -> "AAC (ADTS)"
+    AudioFormat.M4A -> "M4A (AAC)"
+    AudioFormat.FLAC -> "FLAC"
+    AudioFormat.WAV -> "WAV"
+    AudioFormat.OPUS -> "Opus"
 }

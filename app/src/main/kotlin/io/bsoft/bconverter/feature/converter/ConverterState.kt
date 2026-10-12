@@ -10,12 +10,14 @@ import io.bsoft.bconverter.domain.model.MediaMetadata
 import io.bsoft.bconverter.domain.model.ProcessingState
 import io.bsoft.bconverter.domain.model.VideoCodec
 
-enum class ConverterStage { SelectInput, Probing, Configure, Converting, Completed }
+/** Shared by the converter and the audio extractor ([Converting] vs [Extracting] are their respective busy states). */
+enum class ConverterStage { SelectInput, Probing, Configure, Converting, Extracting, Completed }
 
 sealed interface ConverterMessage {
     data class InputProblem(val error: InputError) : ConverterMessage
     data object ProbeFailed : ConverterMessage
     data object NoVideoStream : ConverterMessage
+    data object NoAudioStream : ConverterMessage
     data object NoEncodersAvailable : ConverterMessage
     data object ConversionFailed : ConverterMessage
     data object SaveFailed : ConverterMessage

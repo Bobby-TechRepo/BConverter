@@ -48,4 +48,9 @@ arm64-v8a only: run instrumented/native tests on an arm64 device or emulator.
 `ConverterScreen` (presets, container/codec dropdowns, file name, progress, cancel), `AndroidOutputPublisher`
 (temp file -> user-chosen SAF document, streamed). Advanced numeric settings (resolution, fps, bitrate/CRF, audio bitrate,
 sample rate, channels) are supported by the model/validator/builder but not yet exposed in the UI.
-Next: Phase 6 (audio extraction), advanced settings UI, storage estimation (spec §36), WorkManager/foreground execution (spec §35).
+
+## Phase 6 — Audio extraction (done, needs device verification)
+`AudioFormat` (MP3, AAC/ADTS, M4A, FLAC, WAV, Opus), `AudioExtractionPlanner` (stream copy when the codec matches, otherwise encode),
+`AudioExtractionValidator`, `buildAudioExtractionCommand` (track mapping, metadata kept), engine/session support, and
+`AudioExtractorViewModel` + screen (track picker, format picker, copy toggle). Copy works even with no encoders installed.
+Next: background execution (spec §35) + storage checks (§36), advanced settings UI, then Phase 7 (preview).

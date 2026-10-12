@@ -21,4 +21,7 @@ interface MediaCapabilityRepository {
 
     /** Whether the installed encoder for [codec] accepts CRF; otherwise quality must be set as a bitrate. */
     fun supportsCrf(codec: VideoCodec): Boolean
+
+    /** Whether an audio codec can be encoded, independent of any video container (used for audio-only output). */
+    fun canEncodeAudio(codec: AudioCodec): Boolean
 }

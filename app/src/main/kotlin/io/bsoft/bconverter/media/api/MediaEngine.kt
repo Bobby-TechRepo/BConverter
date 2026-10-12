@@ -1,6 +1,7 @@
 package io.bsoft.bconverter.media.api
 
 import io.bsoft.bconverter.domain.model.MediaMetadata
+import io.bsoft.bconverter.domain.model.AudioExtractionSettings
 import io.bsoft.bconverter.domain.model.ConversionSettings
 import io.bsoft.bconverter.domain.model.MediaSource
 import io.bsoft.bconverter.domain.model.ProbeFailure
@@ -17,7 +18,14 @@ data class ConversionRequest(
     val outputFile: File,
     val settings: ConversionSettings,
 )
-data class AudioExtractionRequest(val jobId: String, val source: MediaSource, val output: File)
+/** Extracts one audio stream from [input] into [outputFile] in the format given by [settings]. */
+data class AudioExtractionRequest(
+    val jobId: String,
+    val input: ResolvedInput,
+    val metadata: MediaMetadata,
+    val outputFile: File,
+    val settings: AudioExtractionSettings,
+)
 data class VideoProject(val id: String, val name: String)
 data class RenderOutput(val file: File)
 data class Thumbnail(val positionMs: Long, val file: File)

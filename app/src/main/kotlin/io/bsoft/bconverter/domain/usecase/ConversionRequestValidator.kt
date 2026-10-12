@@ -23,7 +23,7 @@ class ConversionRequestValidator(private val capabilities: MediaCapabilityReposi
             if (!metadata.hasVideo) add(ConversionIssue.SourceHasNoVideo)
             validateVideo(settings, metadata)
             validateAudio(settings, metadata)
-            if (!isValidName(outputName)) add(ConversionIssue.InvalidOutputName)
+            if (!OutputNames.isValid(outputName)) add(ConversionIssue.InvalidOutputName)
         }
 
     private fun MutableList<ConversionIssue>.validateVideo(settings: ConversionSettings, metadata: MediaMetadata) {
@@ -99,18 +99,10 @@ class ConversionRequestValidator(private val capabilities: MediaCapabilityReposi
     private fun isValid(r: Resolution) =
         r.width in 1..MAX_DIMENSION && r.height in 1..MAX_DIMENSION && r.width % 2 == 0 && r.height % 2 == 0
 
-    private fun isValidName(name: String): Boolean {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty() || trimmed.length > MAX_NAME_LENGTH || trimmed.all { it == '.' }) return false
-        return name.none { it in FORBIDDEN_NAME_CHARS || it.isISOControl() }
-    }
-
     private companion object {
         const val MAX_VIDEO_KBPS = 500_000
         const val MAX_FPS = 240.0
         const val MAX_DIMENSION = 8192
-        const val MAX_NAME_LENGTH = 200
-        const val FORBIDDEN_NAME_CHARS = "/\\:*?\"<>|"
         val AUDIO_KBPS = 8..512
         val LOSSLESS = setOf(AudioCodec.FLAC, AudioCodec.PCM)
         val SAMPLE_RATES = setOf(8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 88200, 96000)
