@@ -30,8 +30,11 @@ class ConversionSession(
 
     @Volatile private var activeJobId: String? = null
 
-    /** Throws [IllegalStateException], touching nothing, unless the session is idle. */
-    suspend fun run(request: ConversionRequest) {
+    /**
+     * Throws [IllegalStateException], touching nothing, unless the session is idle.
+     * With [releaseInput] false the caller keeps ownership of the staged input (e.g. to allow a retry).
+     */
+    suspend fun run(request: ConversionRequest, releaseInput: Boolean = true) {
         transition(ProcessingEvent.Start)
         activeJobId = request.jobId
         try {
@@ -58,7 +61,7 @@ class ConversionSession(
             transitionIfRunning(ProcessingEvent.Fail(FAILED_MESSAGE))
         } finally {
             activeJobId = null
-            resolver.release(request.input)
+            if (releaseInput) resolver.release(request.input)
         }
     }
 

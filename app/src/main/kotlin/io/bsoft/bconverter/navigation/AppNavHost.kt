@@ -6,6 +6,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import io.bsoft.bconverter.feature.converter.ConverterScreen
 import io.bsoft.bconverter.feature.home.HomeDestination
 import io.bsoft.bconverter.feature.home.HomeScreen
 import io.bsoft.bconverter.feature.home.HomeViewModel
@@ -30,8 +31,8 @@ fun AppNavHost() {
             composable(d.route) {
                 val back: () -> Unit = { navController.popBackStack() }
                 when (d) {
-                    HomeDestination.CONVERT_VIDEO, HomeDestination.EXTRACT_AUDIO ->
-                        PickInputScreen(PickKind.VIDEO, d.titleRes, back)
+                    HomeDestination.CONVERT_VIDEO -> ConverterScreen(back)
+                    HomeDestination.EXTRACT_AUDIO -> PickInputScreen(PickKind.VIDEO, d.titleRes, back)
                     else -> PlaceholderScreen(d.titleRes, back)
                 }
             }

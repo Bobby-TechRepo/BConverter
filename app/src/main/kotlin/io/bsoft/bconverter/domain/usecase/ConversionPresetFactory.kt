@@ -32,20 +32,31 @@ import kotlin.math.roundToInt
  */
 class ConversionPresetFactory(private val capabilities: MediaCapabilityRepository) {
 
-    fun create(preset: ConversionPreset, metadata: MediaMetadata, container: ContainerFormat): ConversionSettings? {
+    /**
+     * [videoCodec] / [audioCodec] force a codec choice (null = automatic). A forced codec disables stream copy for that
+     * stream and must be allowed in the container and encodable, otherwise there is no result.
+     */
+    fun create(
+        preset: ConversionPreset,
+        metadata: MediaMetadata,
+        container: ContainerFormat,
+        videoCodec: VideoCodec? = null,
+        audioCodec: AudioCodec? = null,
+    ): ConversionSettings? {
         val videoStream = metadata.videoStreams.firstOrNull() ?: return null
-        val video = videoPlan(preset, videoStream, container) ?: return null
-        val audio = audioPlan(preset, metadata, container) ?: return null
+        val video = videoPlan(preset, videoStream, container, videoCodec) ?: return null
+        val audio = audioPlan(preset, metadata, container, audioCodec) ?: return null
         return ConversionSettings(container, video, audio)
     }
 
-    private fun videoPlan(preset: ConversionPreset, stream: VideoStream, container: ContainerFormat): VideoPlan? {
-        if (preset == ConversionPreset.ORIGINAL_QUALITY) {
+    private fun videoPlan(preset: ConversionPreset, stream: VideoStream, container: ContainerFormat, forced: VideoCodec?): VideoPlan? {
+        if (forced == null && preset == ConversionPreset.ORIGINAL_QUALITY) {
             val source = CodecIds.video(stream.codec)
             if (source != null && source in ContainerCompatibility.videoCodecs(container)) return VideoPlan.Copy
         }
         val available = capabilities.getVideoCodecs(container)
-        val codec = VIDEO_PREFERENCE.firstOrNull { it in available } ?: return null
+        val codec = (if (forced != null) forced.takeIf { it in available } else VIDEO_PREFERENCE.firstOrNull { it in available })
+            ?: return null
         val quality = if (codec.crfRange() != null && capabilities.supportsCrf(codec)) {
             VideoQuality.Crf(crf(preset))
         } else {
@@ -55,14 +66,15 @@ class ConversionPresetFactory(private val capabilities: MediaCapabilityRepositor
         return VideoPlan.Encode(VideoSettings(codec, quality, resolution))
     }
 
-    private fun audioPlan(preset: ConversionPreset, metadata: MediaMetadata, container: ContainerFormat): AudioPlan? {
+    private fun audioPlan(preset: ConversionPreset, metadata: MediaMetadata, container: ContainerFormat, forced: AudioCodec?): AudioPlan? {
         val stream = metadata.audioStreams.firstOrNull() ?: return AudioPlan.None
-        if (preset == ConversionPreset.ORIGINAL_QUALITY) {
+        if (forced == null && preset == ConversionPreset.ORIGINAL_QUALITY) {
             val source = CodecIds.audio(stream.codec)
             if (source != null && source in ContainerCompatibility.audioCodecs(container)) return AudioPlan.Copy
         }
         val available = capabilities.getAudioCodecs(container)
-        val codec = AUDIO_PREFERENCE.firstOrNull { it in available } ?: return null
+        val codec = (if (forced != null) forced.takeIf { it in available } else AUDIO_PREFERENCE.firstOrNull { it in available })
+            ?: return null
         val bitrate = if (codec in LOSSLESS) null else audioKbps(preset)
         return AudioPlan.Encode(AudioSettings(codec, bitrateKbps = bitrate))
     }

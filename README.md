@@ -40,7 +40,12 @@ Not yet done: converter screens/ViewModel, real FFmpeg execution, integration te
 FFmpegKit community fork, free LGPL artifact `ffmpeg-kit-full:8.1.7` — details, licensing and caveats in `docs/FFMPEG.md`.
 arm64-v8a only: run instrumented/native tests on an arm64 device or emulator.
 
-## Phase 5b — Real engine (done, needs device verification)
-`FfmpegMediaEngine` (probe, convert with progress, cancel), `CapabilityProvider` (runtime encoder discovery, CRF awareness,
-MediaCodec cross-check), real `FfmpegKit*` glue and Hilt `MediaModule`. Run `connectedDebugAndroidTest` on arm64.
-Next: converter screens/ViewModel (pick -> probe -> preset -> validate -> convert), then Phase 6 (audio extraction).
+## Phase 5b — Real engine (verified on device)
+`FfmpegMediaEngine`, `CapabilityProvider` (runtime encoder discovery, CRF awareness, MediaCodec cross-check), FFmpegKit glue.
+
+## Phase 5c — Converter flow (done)
+`ConverterViewModel` (pick -> probe -> configure -> destination -> convert -> save; retry after failure keeps the staged input),
+`ConverterScreen` (presets, container/codec dropdowns, file name, progress, cancel), `AndroidOutputPublisher`
+(temp file -> user-chosen SAF document, streamed). Advanced numeric settings (resolution, fps, bitrate/CRF, audio bitrate,
+sample rate, channels) are supported by the model/validator/builder but not yet exposed in the UI.
+Next: Phase 6 (audio extraction), advanced settings UI, storage estimation (spec §36), WorkManager/foreground execution (spec §35).

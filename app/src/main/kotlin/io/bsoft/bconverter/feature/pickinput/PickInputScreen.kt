@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.bsoft.bconverter.R
 import io.bsoft.bconverter.core.ui.BackButton
-import io.bsoft.bconverter.domain.model.InputError
 
 /** Stateful entry point: SAF document picker (MediaStore-backed gallery included) + ViewModel. */
 @Composable
@@ -96,7 +95,7 @@ fun PickInputContent(
                 }
                 is PickInputState.Error -> {
                     Text(
-                        errorMessage(state.error),
+                        inputErrorMessage(state.error),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
                     )
@@ -105,22 +104,5 @@ fun PickInputContent(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun errorMessage(error: InputError): String {
-    val context = LocalContext.current
-    return when (error) {
-        InputError.PermissionDenied -> stringResource(R.string.error_permission_denied)
-        InputError.NotFound -> stringResource(R.string.error_not_found)
-        InputError.Unreadable -> stringResource(R.string.error_unreadable)
-        is InputError.UnsupportedType -> stringResource(R.string.error_unsupported)
-        InputError.Empty -> stringResource(R.string.error_empty)
-        is InputError.InsufficientStorage -> stringResource(
-            R.string.error_insufficient_storage,
-            Formatter.formatFileSize(context, error.requiredBytes),
-            Formatter.formatFileSize(context, error.availableBytes),
-        )
     }
 }

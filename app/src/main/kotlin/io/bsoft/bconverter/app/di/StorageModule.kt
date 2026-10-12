@@ -12,7 +12,9 @@ import io.bsoft.bconverter.core.storage.ContentReader
 import io.bsoft.bconverter.core.storage.FreeSpaceProvider
 import io.bsoft.bconverter.core.storage.StagingDirectory
 import io.bsoft.bconverter.data.storage.DefaultInputResolver
+import io.bsoft.bconverter.data.storage.AndroidOutputPublisher
 import io.bsoft.bconverter.domain.repository.InputResolver
+import io.bsoft.bconverter.domain.repository.OutputPublisher
 import java.io.File
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
@@ -32,6 +34,10 @@ object StorageModule {
 
     @Provides @Singleton
     fun stagingDirectory(@ApplicationContext context: Context) = StagingDirectory(File(context.cacheDir, "staging"))
+
+    @Provides @Singleton
+    fun outputPublisher(@ApplicationContext context: Context, @IoDispatcher dispatcher: CoroutineDispatcher): OutputPublisher =
+        AndroidOutputPublisher(context.contentResolver, dispatcher)
 
     @Provides @Singleton
     fun inputResolver(

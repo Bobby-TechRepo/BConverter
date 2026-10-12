@@ -6,6 +6,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.bsoft.bconverter.core.coroutine.IoDispatcher
 import io.bsoft.bconverter.data.media.MediaProber
+import io.bsoft.bconverter.domain.repository.CapabilitySource
 import io.bsoft.bconverter.domain.repository.InputResolver
 import io.bsoft.bconverter.media.api.MediaEngine
 import io.bsoft.bconverter.media.device.AndroidCodecInfoProvider
@@ -37,6 +38,9 @@ object MediaModule {
     @Provides @Singleton
     fun capabilityProvider(runner: FfmpegListRunner): CapabilityProvider =
         CapabilityProvider(runner, MediaCodecCapabilitySource(AndroidCodecInfoProvider()))
+
+    @Provides @Singleton
+    fun capabilitySource(provider: CapabilityProvider): CapabilitySource = provider
 
     @Provides @Singleton
     fun mediaProber(resolver: InputResolver, runner: FfprobeRunner) = MediaProber(resolver, runner)

@@ -1,6 +1,7 @@
 package io.bsoft.bconverter.media.ffmpeg
 
 import io.bsoft.bconverter.data.media.DefaultMediaCapabilityRepository
+import io.bsoft.bconverter.domain.repository.CapabilitySource
 import io.bsoft.bconverter.domain.repository.MediaCapabilityRepository
 import io.bsoft.bconverter.media.device.MediaCodecCapabilitySource
 import kotlinx.coroutines.sync.Mutex
@@ -14,13 +15,13 @@ import kotlinx.coroutines.sync.withLock
 class CapabilityProvider(
     private val listRunner: FfmpegListRunner,
     private val device: MediaCodecCapabilitySource,
-) {
+) : CapabilitySource {
     private class Loaded(val repository: MediaCapabilityRepository, val names: EncoderNames)
 
     private val mutex = Mutex()
     private var cached: Loaded? = null
 
-    suspend fun repository(): MediaCapabilityRepository = load().repository
+    override suspend fun repository(): MediaCapabilityRepository = load().repository
     suspend fun encoderNames(): EncoderNames = load().names
 
     private suspend fun load(): Loaded = mutex.withLock {

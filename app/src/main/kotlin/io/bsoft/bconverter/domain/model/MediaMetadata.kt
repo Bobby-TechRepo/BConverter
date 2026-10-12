@@ -1,7 +1,8 @@
 package io.bsoft.bconverter.domain.model
 
-enum class ContainerFormat(val extension: String) {
-    MP4("mp4"), MKV("mkv"), THREE_GP("3gp"), WEBM("webm"), MOV("mov"), AVI("avi"), MPEG_TS("ts"),
+enum class ContainerFormat(val extension: String, val mimeType: String) {
+    MP4("mp4", "video/mp4"), MKV("mkv", "video/x-matroska"), THREE_GP("3gp", "video/3gpp"), WEBM("webm", "video/webm"),
+    MOV("mov", "video/quicktime"), AVI("avi", "video/x-msvideo"), MPEG_TS("ts", "video/mp2t"),
 }
 
 data class VideoStream(
