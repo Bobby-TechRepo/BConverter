@@ -1,5 +1,8 @@
 package io.bsoft.bconverter.domain.usecase
 
+import io.bsoft.bconverter.domain.model.AudioExtractionMode
+import io.bsoft.bconverter.domain.model.AudioExtractionSettings
+import io.bsoft.bconverter.domain.model.AudioFormat
 import io.bsoft.bconverter.domain.model.AudioPlan
 import io.bsoft.bconverter.domain.model.ContainerFormat
 import io.bsoft.bconverter.domain.model.ConversionSettings
@@ -9,6 +12,7 @@ import io.bsoft.bconverter.domain.model.VideoPlan
 import io.bsoft.bconverter.fakes.FakeInputResolver
 import io.bsoft.bconverter.fakes.FakeMediaEngine
 import io.bsoft.bconverter.fakes.TestMedia
+import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
 import io.bsoft.bconverter.media.api.MediaProcessingProgress
 import io.bsoft.bconverter.media.api.MediaProcessingResult
@@ -150,5 +154,30 @@ class ConversionSessionTest {
         val job = launch { session.run(request, releaseInput = false) }; runCurrent()
         session.cancel(); job.join()
         assertTrue(resolver.released.isEmpty())
+    }
+
+    // ---- audio extraction runs through the same state machine ----
+    private fun extraction() = AudioExtractionRequest(
+        "job-2", input, TestMedia.metadata(), output, AudioExtractionSettings(AudioFormat.M4A, 0, AudioExtractionMode.Copy),
+    )
+
+    @Test fun an_extraction_completes_and_releases_the_input() = runTest {
+        session.runExtraction(extraction())
+        assertEquals(ProcessingState.Completed, session.state.value)
+        assertEquals(listOf(extraction().copy(jobId = "job-2")).size, engine.extracted.size); assertEquals(listOf(input), resolver.released)
+    }
+
+    @Test fun a_failed_extraction_removes_the_partial_output() = runTest {
+        engine.processingResult = MediaProcessingResult.Failure("x")
+        session.runExtraction(extraction())
+        assertTrue(session.state.value is ProcessingState.Failed); assertFalse(output.exists())
+    }
+
+    @Test fun a_cancelled_extraction_stops_the_engine_and_cleans_up() = runTest {
+        engine.convertGate = CompletableDeferred()
+        val job = launch { session.runExtraction(extraction(), releaseInput = false) }; runCurrent()
+        session.cancel(); job.join()
+        assertEquals(listOf("job-2"), engine.cancelledJobIds)
+        assertEquals(ProcessingState.Cancelled, session.state.value); assertFalse(output.exists()); assertTrue(resolver.released.isEmpty())
     }
 }

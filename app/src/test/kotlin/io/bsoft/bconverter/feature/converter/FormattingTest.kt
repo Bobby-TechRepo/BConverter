@@ -25,4 +25,9 @@ class FormattingTest {
     @Test fun container_names() = assertEquals(
         listOf("MP4", "MKV", "3GP", "WebM", "MOV", "AVI", "MPEG-TS"), ContainerFormat.entries.map { it.displayName },
     )
+
+    @Test fun audio_format_names() = assertEquals(
+        listOf("MP3", "AAC (ADTS)", "M4A (AAC)", "FLAC", "WAV", "Opus"),
+        io.bsoft.bconverter.domain.model.AudioFormat.entries.map { it.displayName },
+    )
 }

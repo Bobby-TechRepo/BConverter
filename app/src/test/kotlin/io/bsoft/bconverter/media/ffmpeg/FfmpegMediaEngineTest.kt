@@ -1,6 +1,9 @@
 package io.bsoft.bconverter.media.ffmpeg
 
 import io.bsoft.bconverter.data.media.MediaProber
+import io.bsoft.bconverter.domain.model.AudioExtractionMode
+import io.bsoft.bconverter.domain.model.AudioExtractionSettings
+import io.bsoft.bconverter.domain.model.AudioFormat
 import io.bsoft.bconverter.domain.model.AudioPlan
 import io.bsoft.bconverter.domain.model.ContainerFormat
 import io.bsoft.bconverter.domain.model.ConversionSettings
@@ -12,6 +15,7 @@ import io.bsoft.bconverter.fakes.FakeFfmpegExecutor
 import io.bsoft.bconverter.fakes.FakeFfprobeRunner
 import io.bsoft.bconverter.fakes.FakeInputResolver
 import io.bsoft.bconverter.fakes.TestMedia
+import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
 import io.bsoft.bconverter.media.api.MediaEngineException
 import io.bsoft.bconverter.media.api.MediaProcessingProgress
@@ -104,5 +108,42 @@ class FfmpegMediaEngineTest {
         runner.result = FfprobeRunResult.Success("garbage")
         try { engine.probe(MediaSource.FileSource(File("/tmp/a.mp4"))); fail("expected exception") }
         catch (e: MediaEngineException) { assertEquals(ProbeFailure.InvalidOutput, e.failure) }
+    }
+
+    // ---- audio extraction ----
+    private fun extraction(out: File = File(tmp.root, "out.m4a")) = AudioExtractionRequest(
+        "job-1", request.input, request.metadata, out, AudioExtractionSettings(AudioFormat.M4A, 0, AudioExtractionMode.Copy),
+    )
+
+    @Test fun extraction_runs_the_built_command_under_the_job_id() = runTest {
+        val req = extraction().also { it.outputFile.writeText("data") }
+        engine.extractAudio(req)
+        val expected = DefaultFfmpegCommandBuilder().buildAudioExtractionCommand(req).toArguments()
+        assertEquals(listOf(FakeFfmpegExecutor.Call("job-1", expected)), executor.calls)
+    }
+
+    @Test fun extraction_with_an_output_file_is_success() = runTest {
+        val req = extraction().also { it.outputFile.writeText("data") }
+        assertEquals(MediaProcessingResult.Success(req.outputFile), engine.extractAudio(req))
+    }
+
+    @Test fun extraction_without_an_output_file_is_a_failure() = runTest {
+        assertTrue(engine.extractAudio(extraction()) is MediaProcessingResult.Failure)
+    }
+
+    @Test fun extraction_failure_and_cancellation_are_mapped() = runTest {
+        executor.result = FfmpegExecResult.Failure(2)
+        assertTrue((engine.extractAudio(extraction()) as MediaProcessingResult.Failure).message.contains("2"))
+        executor.result = FfmpegExecResult.Cancelled
+        assertEquals(MediaProcessingResult.Cancelled, engine.extractAudio(extraction()))
+    }
+
+    @Test fun extraction_statistics_are_published_as_progress() = runTest {
+        val req = extraction().also { it.outputFile.writeText("data") }
+        executor.statistics = listOf(2500L to 2.0)
+        val first = async { engine.observeProgress("job-1").first() }
+        runCurrent()
+        engine.extractAudio(req)
+        assertEquals(MediaProcessingProgress(2500, 10_000, 0.25f, 2.0, 3750), first.await())
     }
 }

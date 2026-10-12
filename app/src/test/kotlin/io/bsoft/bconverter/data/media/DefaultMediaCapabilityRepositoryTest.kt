@@ -93,4 +93,9 @@ class DefaultMediaCapabilityRepositoryTest {
         val r = DefaultMediaCapabilityRepository(listOf(CodecAvailability(H264, canDecode = true, canEncode = false, supportsCrf = true)))
         assertFalse(r.supportsCrf(H264))
     }
+
+    // ---- audio-only encoding (not tied to a container) ----
+    @Test fun an_audio_codec_with_an_encoder_can_be_encoded() = assertTrue(repo(enc(MP3)).canEncodeAudio(MP3))
+    @Test fun decode_only_audio_codecs_cannot_be_encoded() = assertFalse(repo(dec(MP3)).canEncodeAudio(MP3))
+    @Test fun absent_audio_codecs_cannot_be_encoded() = assertFalse(repo(enc(AAC)).canEncodeAudio(OPUS))
 }

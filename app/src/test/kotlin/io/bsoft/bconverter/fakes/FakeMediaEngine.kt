@@ -18,9 +18,11 @@ class FakeMediaEngine : MediaEngine {
 
     /** Lets a test simulate FFmpeg writing the output file. */
     var onConvert: ((ConversionRequest) -> Unit)? = null
+    var onExtract: ((AudioExtractionRequest) -> Unit)? = null
 
     val probedSources = mutableListOf<MediaSource>()
     val converted = mutableListOf<ConversionRequest>()
+    val extracted = mutableListOf<AudioExtractionRequest>()
     val cancelledJobIds = mutableListOf<String>()
     private val progressFlows = mutableMapOf<String, MutableSharedFlow<MediaProcessingProgress>>()
 
@@ -36,7 +38,12 @@ class FakeMediaEngine : MediaEngine {
         convertError?.let { throw it }
         return convertGate?.await() ?: processingResult
     }
-    override suspend fun extractAudio(request: AudioExtractionRequest) = processingResult
+    override suspend fun extractAudio(request: AudioExtractionRequest): MediaProcessingResult {
+        extracted += request
+        onExtract?.invoke(request)
+        convertError?.let { throw it }
+        return convertGate?.await() ?: processingResult
+    }
     override suspend fun render(project: VideoProject, output: RenderOutput) = processingResult
     override suspend fun generateThumbnail(source: MediaSource, positionMs: Long) =
         Thumbnail(positionMs, File("fake-thumb.jpg"))
