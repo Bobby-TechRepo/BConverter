@@ -64,4 +64,5 @@ sealed interface ConversionIssue {
     data class InvalidChannels(val codec: AudioCodec) : ConversionIssue
     data object InvalidOutputName : ConversionIssue
     data object InvalidAudioStream : ConversionIssue
+    data class InsufficientStorage(val requiredBytes: Long, val availableBytes: Long) : ConversionIssue
 }

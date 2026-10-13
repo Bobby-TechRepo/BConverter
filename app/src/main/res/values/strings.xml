@@ -72,4 +72,10 @@
     <string name="extractor_extract_another">Extract from another file</string>
     <string name="msg_no_audio">This file has no audio to extract.</string>
     <string name="issue_audio_stream">That audio track does not exist.</string>
+    <string name="export_channel_name">Conversions</string>
+    <string name="export_running">Working… %1$d%%</string>
+    <string name="export_running_indeterminate">Working…</string>
+    <string name="export_done">Finished. Your file is ready.</string>
+    <string name="export_failed">Something went wrong. Open the app to try again.</string>
+    <string name="issue_insufficient_storage">Not enough free storage: about %1$s needed, %2$s available.</string>
 </resources>

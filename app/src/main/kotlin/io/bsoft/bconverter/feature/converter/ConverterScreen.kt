@@ -55,6 +55,7 @@ import io.bsoft.bconverter.domain.model.ConversionIssue
 import io.bsoft.bconverter.domain.model.ConversionPreset
 import io.bsoft.bconverter.domain.model.ProcessingState
 import io.bsoft.bconverter.domain.model.VideoCodec
+import io.bsoft.bconverter.feature.export.RequestNotificationPermissionWhen
 import io.bsoft.bconverter.feature.pickinput.PickKind
 import io.bsoft.bconverter.feature.pickinput.inputErrorMessage
 import kotlin.math.roundToInt
@@ -88,6 +89,7 @@ fun ConverterScreen(onBack: () -> Unit, viewModel: ConverterViewModel = hiltView
             }
         }
     }
+    RequestNotificationPermissionWhen(state.stage == ConverterStage.Configure)
     BackHandler(enabled = state.stage == ConverterStage.Converting) { viewModel.onCancel() }
     ConverterContent(
         state = state,
@@ -211,7 +213,7 @@ private fun ConfigureForm(state: ConverterUiState, actions: ConverterActions) {
 
         state.issues.forEach { issue ->
             Text(
-                stringResource(issue.messageRes()),
+                issue.messageText(),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
             )
@@ -307,4 +309,15 @@ internal fun ConversionIssue.messageRes(): Int = when (this) {
     is ConversionIssue.InvalidChannels -> R.string.issue_channels
     ConversionIssue.InvalidOutputName -> R.string.issue_output_name
     ConversionIssue.InvalidAudioStream -> R.string.issue_audio_stream
+    is ConversionIssue.InsufficientStorage -> R.string.issue_insufficient_storage
+}
+
+/** Like [messageRes], but fills in sizes for the storage issue. */
+@Composable
+internal fun ConversionIssue.messageText(): String = when (this) {
+    is ConversionIssue.InsufficientStorage -> {
+        val context = LocalContext.current
+        stringResource(R.string.issue_insufficient_storage, Formatter.formatFileSize(context, requiredBytes), Formatter.formatFileSize(context, availableBytes))
+    }
+    else -> stringResource(messageRes())
 }

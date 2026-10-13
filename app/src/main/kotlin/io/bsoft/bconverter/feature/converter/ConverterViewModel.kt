@@ -8,7 +8,12 @@ import io.bsoft.bconverter.core.storage.StagingDirectory
 import io.bsoft.bconverter.data.media.MediaProber
 import io.bsoft.bconverter.domain.model.AudioCodec
 import io.bsoft.bconverter.domain.model.ContainerFormat
+import io.bsoft.bconverter.domain.model.ConversionIssue
 import io.bsoft.bconverter.domain.model.ConversionPreset
+import io.bsoft.bconverter.domain.model.ExportJob
+import io.bsoft.bconverter.domain.model.ExportTask
+import io.bsoft.bconverter.domain.model.JobFailure
+import io.bsoft.bconverter.domain.model.JobStatus
 import io.bsoft.bconverter.domain.model.MediaSource
 import io.bsoft.bconverter.domain.model.ProbeFailure
 import io.bsoft.bconverter.domain.model.ProbeOutcome
@@ -18,14 +23,13 @@ import io.bsoft.bconverter.domain.model.VideoCodec
 import io.bsoft.bconverter.domain.repository.CapabilitySource
 import io.bsoft.bconverter.domain.repository.InputResolver
 import io.bsoft.bconverter.domain.repository.MediaCapabilityRepository
-import io.bsoft.bconverter.domain.repository.OutputPublisher
-import io.bsoft.bconverter.domain.repository.PublishResult
 import io.bsoft.bconverter.domain.usecase.ConversionPresetFactory
 import io.bsoft.bconverter.domain.usecase.ConversionRequestValidator
-import io.bsoft.bconverter.domain.usecase.ConversionSession
+import io.bsoft.bconverter.domain.usecase.ExportJobLauncher
+import io.bsoft.bconverter.domain.usecase.StorageCheck
+import io.bsoft.bconverter.domain.usecase.StorageEstimator
+import io.bsoft.bconverter.domain.usecase.StorageGuard
 import io.bsoft.bconverter.media.api.ConversionRequest
-import io.bsoft.bconverter.media.api.MediaEngine
-import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -34,25 +38,26 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
  * Drives the converter flow (spec §17): pick → probe → configure → destination → convert → saved.
- * The staged input is owned here until the conversion is saved, the user starts over, or the screen is left,
- * so a failed or cancelled conversion can be retried without copying the file again.
+ * The conversion itself runs as a background export job that outlives this screen. The staged input is owned
+ * here until the job is saved, the user starts over, or the screen is left (a still-running job then releases it).
  */
 @HiltViewModel
 class ConverterViewModel @Inject constructor(
     private val prober: MediaProber,
     private val capabilities: CapabilitySource,
-    engine: MediaEngine,
     private val resolver: InputResolver,
     private val staging: StagingDirectory,
-    private val publisher: OutputPublisher,
+    private val storage: StorageGuard,
+    private val jobs: ExportJobLauncher,
 ) : ViewModel() {
-    private val session = ConversionSession(engine, resolver)
     private val _state = MutableStateFlow(ConverterUiState())
     val state: StateFlow<ConverterUiState> = _state.asStateFlow()
     private val _events = Channel<ConverterEvent>(Channel.BUFFERED)
@@ -60,11 +65,8 @@ class ConverterViewModel @Inject constructor(
 
     private var input: ResolvedInput? = null
     private var repository: MediaCapabilityRepository? = null
-    private var conversionJob: Job? = null
-
-    init {
-        viewModelScope.launch { session.state.collect { s -> _state.update { it.copy(processing = s) } } }
-    }
+    private var statusJob: Job? = null
+    private var activeJobId: String? = null
 
     // ---- input ----
     /** [uri] is null when the user dismissed the picker. */
@@ -166,7 +168,10 @@ class ConverterViewModel @Inject constructor(
         val repo = repository ?: return
         val metadata = s.source?.metadata ?: return
         if (s.stage != ConverterStage.Configure) return
-        val issues = ConversionRequestValidator(repo).validate(settings, metadata, form.outputName)
+        val estimate = StorageEstimator.estimateConversion(settings, metadata, input?.sizeBytes ?: 0L)
+        val storageIssue = (storage.check(estimate) as? StorageCheck.Insufficient)
+            ?.let { ConversionIssue.InsufficientStorage(it.requiredBytes, it.availableBytes) }
+        val issues = ConversionRequestValidator(repo).validate(settings, metadata, form.outputName) + listOfNotNull(storageIssue)
         _state.update { it.copy(issues = issues, message = null) }
         if (issues.isEmpty()) {
             _events.trySend(
@@ -188,37 +193,41 @@ class ConverterViewModel @Inject constructor(
         val temp = staging.newFile("$jobId.${settings.container.extension}")
         val request = ConversionRequest(jobId, resolved, source.metadata, temp, settings)
         _state.update { it.copy(stage = ConverterStage.Converting, message = null) }
-        conversionJob = viewModelScope.launch {
-            session.run(request, releaseInput = false)
-            when (session.state.value) {
-                ProcessingState.Completed -> save(temp, destination)
-                is ProcessingState.Failed -> backToForm(ConverterMessage.ConversionFailed)
-                else -> backToForm(null) // cancelled
-            }
-            session.reset()
-        }
+        track(jobs.launch(ExportJob(jobId, source.displayName, ExportTask.Convert(request), destination)), jobId)
     }
 
-    private suspend fun save(temp: File, destination: Uri) {
-        val result = publisher.publish(temp, destination)
-        temp.delete()
-        when (result) {
-            PublishResult.Success -> { releaseInput(); _state.update { it.copy(stage = ConverterStage.Completed) } }
-            PublishResult.Failure -> backToForm(ConverterMessage.SaveFailed)
+    private fun track(status: StateFlow<JobStatus>, jobId: String) {
+        activeJobId = jobId
+        statusJob = viewModelScope.launch {
+            val terminal = status
+                .onEach { s ->
+                    if (s is JobStatus.Running) {
+                        _state.update { it.copy(processing = ProcessingState.Running(s.progress.coerceIn(0f, 1f), "Converting")) }
+                    }
+                }
+                .first { it.isTerminal }
+            jobs.finish(jobId)
+            activeJobId = null
+            when (terminal) {
+                JobStatus.Completed -> { releaseInput(); _state.update { it.copy(stage = ConverterStage.Completed, processing = ProcessingState.Idle) } }
+                is JobStatus.Failed ->
+                    backToForm(if (terminal.reason == JobFailure.SaveFailed) ConverterMessage.SaveFailed else ConverterMessage.ConversionFailed)
+                else -> backToForm(null) // cancelled
+            }
         }
     }
 
     private fun backToForm(message: ConverterMessage?) {
-        _state.update { it.copy(stage = ConverterStage.Configure, message = message) }
+        _state.update { it.copy(stage = ConverterStage.Configure, message = message, processing = ProcessingState.Idle) }
     }
 
     fun onCancel() {
         if (_state.value.stage != ConverterStage.Converting) return
-        viewModelScope.launch { session.cancel() }
+        activeJobId?.let { jobs.cancel(it) }
     }
 
     fun onConvertAnother() {
-        conversionJob?.cancel()
+        statusJob?.cancel()
         releaseInput()
         repository = null
         _state.value = ConverterUiState()
@@ -229,5 +238,9 @@ class ConverterViewModel @Inject constructor(
         input = null
     }
 
-    override fun onCleared() { releaseInput() }
+    override fun onCleared() {
+        // A job still running keeps going in the background and releases the input itself when it finishes.
+        val running = activeJobId
+        if (running != null) jobs.detach(running) else releaseInput()
+    }
 }

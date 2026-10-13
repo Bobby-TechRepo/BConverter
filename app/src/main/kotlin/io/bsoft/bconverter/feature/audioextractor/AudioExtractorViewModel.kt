@@ -7,6 +7,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.bsoft.bconverter.core.storage.StagingDirectory
 import io.bsoft.bconverter.data.media.MediaProber
 import io.bsoft.bconverter.domain.model.AudioFormat
+import io.bsoft.bconverter.domain.model.ConversionIssue
+import io.bsoft.bconverter.domain.model.ExportJob
+import io.bsoft.bconverter.domain.model.ExportTask
+import io.bsoft.bconverter.domain.model.JobFailure
+import io.bsoft.bconverter.domain.model.JobStatus
 import io.bsoft.bconverter.domain.model.MediaSource
 import io.bsoft.bconverter.domain.model.ProbeFailure
 import io.bsoft.bconverter.domain.model.ProbeOutcome
@@ -15,18 +20,17 @@ import io.bsoft.bconverter.domain.model.ResolvedInput
 import io.bsoft.bconverter.domain.repository.CapabilitySource
 import io.bsoft.bconverter.domain.repository.InputResolver
 import io.bsoft.bconverter.domain.repository.MediaCapabilityRepository
-import io.bsoft.bconverter.domain.repository.OutputPublisher
-import io.bsoft.bconverter.domain.repository.PublishResult
 import io.bsoft.bconverter.domain.usecase.AudioExtractionPlanner
 import io.bsoft.bconverter.domain.usecase.AudioExtractionValidator
-import io.bsoft.bconverter.domain.usecase.ConversionSession
+import io.bsoft.bconverter.domain.usecase.ExportJobLauncher
+import io.bsoft.bconverter.domain.usecase.StorageCheck
+import io.bsoft.bconverter.domain.usecase.StorageEstimator
+import io.bsoft.bconverter.domain.usecase.StorageGuard
 import io.bsoft.bconverter.feature.converter.ConverterEvent
 import io.bsoft.bconverter.feature.converter.ConverterMessage
 import io.bsoft.bconverter.feature.converter.ConverterStage
 import io.bsoft.bconverter.feature.converter.SourceInfo
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
-import io.bsoft.bconverter.media.api.MediaEngine
-import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -35,6 +39,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -48,12 +54,11 @@ import kotlinx.coroutines.launch
 class AudioExtractorViewModel @Inject constructor(
     private val prober: MediaProber,
     private val capabilities: CapabilitySource,
-    engine: MediaEngine,
     private val resolver: InputResolver,
     private val staging: StagingDirectory,
-    private val publisher: OutputPublisher,
+    private val storage: StorageGuard,
+    private val jobs: ExportJobLauncher,
 ) : ViewModel() {
-    private val session = ConversionSession(engine, resolver)
     private val _state = MutableStateFlow(AudioExtractorUiState())
     val state: StateFlow<AudioExtractorUiState> = _state.asStateFlow()
     private val _events = Channel<ConverterEvent>(Channel.BUFFERED)
@@ -62,11 +67,8 @@ class AudioExtractorViewModel @Inject constructor(
     private var input: ResolvedInput? = null
     private var repository: MediaCapabilityRepository? = null
     private var planner: AudioExtractionPlanner? = null
-    private var job: Job? = null
-
-    init {
-        viewModelScope.launch { session.state.collect { s -> _state.update { it.copy(processing = s) } } }
-    }
+    private var statusJob: Job? = null
+    private var activeJobId: String? = null
 
     // ---- input ----
     /** [uri] is null when the user dismissed the picker. */
@@ -160,7 +162,10 @@ class AudioExtractorViewModel @Inject constructor(
         val repo = repository ?: return
         val metadata = s.source?.metadata ?: return
         if (s.stage != ConverterStage.Configure) return
-        val issues = AudioExtractionValidator(repo).validate(settings, metadata, form.outputName)
+        val estimate = StorageEstimator.estimateExtraction(settings, metadata, input?.sizeBytes ?: 0L)
+        val storageIssue = (storage.check(estimate) as? StorageCheck.Insufficient)
+            ?.let { ConversionIssue.InsufficientStorage(it.requiredBytes, it.availableBytes) }
+        val issues = AudioExtractionValidator(repo).validate(settings, metadata, form.outputName) + listOfNotNull(storageIssue)
         _state.update { it.copy(issues = issues, message = null) }
         if (issues.isEmpty()) {
             _events.trySend(ConverterEvent.RequestDestination("${form.outputName.trim()}.${form.format.extension}", form.format.mimeType))
@@ -180,37 +185,41 @@ class AudioExtractorViewModel @Inject constructor(
         val temp = staging.newFile("$jobId.${settings.format.extension}")
         val request = AudioExtractionRequest(jobId, resolved, source.metadata, temp, settings)
         _state.update { it.copy(stage = ConverterStage.Extracting, message = null) }
-        job = viewModelScope.launch {
-            session.runExtraction(request, releaseInput = false)
-            when (session.state.value) {
-                ProcessingState.Completed -> save(temp, destination)
-                is ProcessingState.Failed -> backToForm(ConverterMessage.ConversionFailed)
-                else -> backToForm(null) // cancelled
-            }
-            session.reset()
-        }
+        track(jobs.launch(ExportJob(jobId, source.displayName, ExportTask.Extract(request), destination)), jobId)
     }
 
-    private suspend fun save(temp: File, destination: Uri) {
-        val result = publisher.publish(temp, destination)
-        temp.delete()
-        when (result) {
-            PublishResult.Success -> { releaseInput(); _state.update { it.copy(stage = ConverterStage.Completed) } }
-            PublishResult.Failure -> backToForm(ConverterMessage.SaveFailed)
+    private fun track(status: StateFlow<JobStatus>, jobId: String) {
+        activeJobId = jobId
+        statusJob = viewModelScope.launch {
+            val terminal = status
+                .onEach { s ->
+                    if (s is JobStatus.Running) {
+                        _state.update { it.copy(processing = ProcessingState.Running(s.progress.coerceIn(0f, 1f), "Converting")) }
+                    }
+                }
+                .first { it.isTerminal }
+            jobs.finish(jobId)
+            activeJobId = null
+            when (terminal) {
+                JobStatus.Completed -> { releaseInput(); _state.update { it.copy(stage = ConverterStage.Completed, processing = ProcessingState.Idle) } }
+                is JobStatus.Failed ->
+                    backToForm(if (terminal.reason == JobFailure.SaveFailed) ConverterMessage.SaveFailed else ConverterMessage.ConversionFailed)
+                else -> backToForm(null) // cancelled
+            }
         }
     }
 
     private fun backToForm(message: ConverterMessage?) {
-        _state.update { it.copy(stage = ConverterStage.Configure, message = message) }
+        _state.update { it.copy(stage = ConverterStage.Configure, message = message, processing = ProcessingState.Idle) }
     }
 
     fun onCancel() {
         if (_state.value.stage != ConverterStage.Extracting) return
-        viewModelScope.launch { session.cancel() }
+        activeJobId?.let { jobs.cancel(it) }
     }
 
     fun onExtractAnother() {
-        job?.cancel()
+        statusJob?.cancel()
         releaseInput()
         repository = null
         planner = null
@@ -222,5 +231,9 @@ class AudioExtractorViewModel @Inject constructor(
         input = null
     }
 
-    override fun onCleared() { releaseInput() }
+    override fun onCleared() {
+        // A job still running keeps going in the background and releases the input itself when it finishes.
+        val running = activeJobId
+        if (running != null) jobs.detach(running) else releaseInput()
+    }
 }

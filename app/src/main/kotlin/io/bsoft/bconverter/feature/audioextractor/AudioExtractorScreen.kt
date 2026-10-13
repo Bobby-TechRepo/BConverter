@@ -49,7 +49,8 @@ import io.bsoft.bconverter.feature.converter.Dropdown
 import io.bsoft.bconverter.feature.converter.MessageText
 import io.bsoft.bconverter.feature.converter.SourceCard
 import io.bsoft.bconverter.feature.converter.displayName
-import io.bsoft.bconverter.feature.converter.messageRes
+import io.bsoft.bconverter.feature.converter.messageText
+import io.bsoft.bconverter.feature.export.RequestNotificationPermissionWhen
 import io.bsoft.bconverter.feature.pickinput.PickKind
 import kotlin.math.roundToInt
 
@@ -81,6 +82,7 @@ fun AudioExtractorScreen(onBack: () -> Unit, viewModel: AudioExtractorViewModel 
             }
         }
     }
+    RequestNotificationPermissionWhen(state.stage == ConverterStage.Configure)
     BackHandler(enabled = state.stage == ConverterStage.Extracting) { viewModel.onCancel() }
     AudioExtractorContent(
         state = state,
@@ -187,7 +189,7 @@ private fun ConfigureForm(state: AudioExtractorUiState, actions: ExtractorAction
         )
         state.issues.forEach { issue ->
             Text(
-                stringResource(issue.messageRes()),
+                issue.messageText(),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
             )

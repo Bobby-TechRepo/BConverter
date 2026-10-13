@@ -49,8 +49,17 @@ arm64-v8a only: run instrumented/native tests on an arm64 device or emulator.
 (temp file -> user-chosen SAF document, streamed). Advanced numeric settings (resolution, fps, bitrate/CRF, audio bitrate,
 sample rate, channels) are supported by the model/validator/builder but not yet exposed in the UI.
 
-## Phase 6 — Audio extraction (done, needs device verification)
-`AudioFormat` (MP3, AAC/ADTS, M4A, FLAC, WAV, Opus), `AudioExtractionPlanner` (stream copy when the codec matches, otherwise encode),
-`AudioExtractionValidator`, `buildAudioExtractionCommand` (track mapping, metadata kept), engine/session support, and
-`AudioExtractorViewModel` + screen (track picker, format picker, copy toggle). Copy works even with no encoders installed.
-Next: background execution (spec §35) + storage checks (§36), advanced settings UI, then Phase 7 (preview).
+## Phase 6 — Audio extraction (verified on device)
+`AudioFormat`, `AudioExtractionPlanner` (copy when the codec matches, else encode), validator, `buildAudioExtractionCommand`,
+`AudioExtractorViewModel` + screen.
+
+## Phase 13 (+ §36) — Background export and storage checks (done, needs device verification)
+- Jobs are `ExportJob`s in an app-wide `ExportRegistry`; `ExportJobExecutor` runs engine -> temp file -> publish, always cleans the
+  temp file, and releases the staged input only if the screen has detached. A job therefore survives leaving the screen.
+- `ExportWorker` (WorkManager, expedited) runs the executor as foreground work with a progress notification and a Cancel action;
+  foreground type is `mediaProcessing` on Android 15+, `dataSync` on 10-14 (both limited to 6 h / 24 h by the OS).
+  After process death the job cannot resume (FFmpeg runs are not resumable): the worker reports it as interrupted.
+- `StorageEstimator` / `StorageGuard`: bitrate x duration (+5 %) estimate vs free space on the cache volume, blocking start with
+  a readable message. The final copy to the destination volume is not checked.
+- Notification permission (Android 13+) is requested when the options screen opens; jobs run without it.
+Not done: re-attaching a new screen to a running job, retry-from-notification, advanced settings UI, Phase 7 (preview).
