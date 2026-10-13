@@ -314,4 +314,9 @@ class ConverterViewModelTest {
         assertEquals("holiday.mp4", registry.job(engine.converted.single().jobId)!!.title)
         engine.convertGate!!.complete(MediaProcessingResult.Success(File("x"))); runCurrent()
     }
+
+    // ---- preview ----
+    @Test fun the_staged_file_is_offered_for_preview() = runTest(dispatcher) {
+        assertEquals(staged.file, opened().state.value.source!!.previewFile)
+    }
 }

@@ -295,4 +295,9 @@ class AudioExtractorViewModelTest {
         engine.convertGate!!.complete(MediaProcessingResult.Success(File("x"))); runCurrent()
         assertEquals(listOf(staged), resolver.released); assertEquals(1, publisher.published.size)
     }
+
+    // ---- preview ----
+    @Test fun the_staged_file_is_offered_for_preview() = runTest(dispatcher) {
+        assertEquals(staged.file, opened().state.value.source!!.previewFile)
+    }
 }
