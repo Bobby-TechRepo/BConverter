@@ -96,7 +96,7 @@ class AudioExtractorViewModel @Inject constructor(
                 planner = newPlanner
                 _state.value = AudioExtractorUiState(
                     stage = ConverterStage.Configure,
-                    source = SourceInfo(resolved.displayName, resolved.sizeBytes, outcome.metadata),
+                    source = SourceInfo(resolved.displayName, resolved.sizeBytes, outcome.metadata, resolved.file),
                 )
                 applyForm(ExtractorForm(0, default.format, preferCopy = true, outputName = defaultName(resolved.displayName)))
             }

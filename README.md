@@ -63,3 +63,10 @@ sample rate, channels) are supported by the model/validator/builder but not yet 
   a readable message. The final copy to the destination volume is not checked.
 - Notification permission (Android 13+) is requested when the options screen opens; jobs run without it.
 Not done: re-attaching a new screen to a running job, retry-from-notification, advanced settings UI, Phase 7 (preview).
+
+## Phase 7 — Media3 preview (done, needs device verification)
+`PlaybackController` (pure state machine: play only when ready, clamped seeking, replay after the end, errors) in front of a
+`PlayerEngine` seam; `Media3PlayerEngine` (ExoPlayer, audio focus, position polling) is the real implementation.
+`PreviewPlayer` + `PreviewControls` show the staged source on both options screens (pause on app stop, released on leave).
+Media3 is pinned to 1.5.1 to match compileSdk 35; bump with compileSdk later. This is also the base for the editor's preview.
+Next: timeline model and operations (split/trim/delete/move/speed) with undo/redo, then rendering.

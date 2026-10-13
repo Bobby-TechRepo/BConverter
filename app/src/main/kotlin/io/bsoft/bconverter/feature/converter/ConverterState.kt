@@ -9,6 +9,7 @@ import io.bsoft.bconverter.domain.model.InputError
 import io.bsoft.bconverter.domain.model.MediaMetadata
 import io.bsoft.bconverter.domain.model.ProcessingState
 import io.bsoft.bconverter.domain.model.VideoCodec
+import java.io.File
 
 /** Shared by the converter and the audio extractor ([Converting] vs [Extracting] are their respective busy states). */
 enum class ConverterStage { SelectInput, Probing, Configure, Converting, Extracting, Completed }
@@ -23,7 +24,8 @@ sealed interface ConverterMessage {
     data object SaveFailed : ConverterMessage
 }
 
-data class SourceInfo(val displayName: String, val sizeBytes: Long, val metadata: MediaMetadata)
+/** [previewFile] is a plain, readable copy of the source for the preview player (null when none is available). */
+data class SourceInfo(val displayName: String, val sizeBytes: Long, val metadata: MediaMetadata, val previewFile: File? = null)
 
 /** What the user chose; `videoCodec`/`audioCodec` null means automatic. The concrete settings are derived from it. */
 data class ConverterForm(

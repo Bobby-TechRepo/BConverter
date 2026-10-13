@@ -48,6 +48,8 @@ dependencies {
     implementation(libs.ffmpeg.kit.full)
     implementation(libs.smart.exception.java)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)

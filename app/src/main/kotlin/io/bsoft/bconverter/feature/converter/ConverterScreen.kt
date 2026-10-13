@@ -57,6 +57,7 @@ import io.bsoft.bconverter.domain.model.ProcessingState
 import io.bsoft.bconverter.domain.model.VideoCodec
 import io.bsoft.bconverter.feature.export.RequestNotificationPermissionWhen
 import io.bsoft.bconverter.feature.pickinput.PickKind
+import io.bsoft.bconverter.feature.preview.PreviewPlayer
 import io.bsoft.bconverter.feature.pickinput.inputErrorMessage
 import kotlin.math.roundToInt
 
@@ -169,6 +170,7 @@ private fun ConfigureForm(state: ConverterUiState, actions: ConverterActions) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        source.previewFile?.let { PreviewPlayer(it) }
         SourceCard(source)
         state.message?.let { MessageText(it) }
 

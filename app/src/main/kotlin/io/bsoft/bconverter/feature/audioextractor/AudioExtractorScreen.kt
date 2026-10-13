@@ -52,6 +52,7 @@ import io.bsoft.bconverter.feature.converter.displayName
 import io.bsoft.bconverter.feature.converter.messageText
 import io.bsoft.bconverter.feature.export.RequestNotificationPermissionWhen
 import io.bsoft.bconverter.feature.pickinput.PickKind
+import io.bsoft.bconverter.feature.preview.PreviewPlayer
 import kotlin.math.roundToInt
 
 data class ExtractorActions(
@@ -154,6 +155,7 @@ private fun ConfigureForm(state: AudioExtractorUiState, actions: ExtractorAction
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        source.previewFile?.let { PreviewPlayer(it) }
         SourceCard(source)
         state.message?.let { MessageText(it) }
         if (trackOptions.size > 1) {

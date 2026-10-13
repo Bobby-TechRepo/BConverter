@@ -92,7 +92,7 @@ class ConverterViewModel @Inject constructor(
                 repository = repo
                 _state.value = ConverterUiState(
                     stage = ConverterStage.Configure,
-                    source = SourceInfo(resolved.displayName, resolved.sizeBytes, outcome.metadata),
+                    source = SourceInfo(resolved.displayName, resolved.sizeBytes, outcome.metadata, resolved.file),
                     containers = containers,
                 )
                 val container = if (ContainerFormat.MP4 in containers) ContainerFormat.MP4 else containers.first()

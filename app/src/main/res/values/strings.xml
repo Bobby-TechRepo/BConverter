@@ -78,4 +78,11 @@
     <string name="export_done">Finished. Your file is ready.</string>
     <string name="export_failed">Something went wrong. Open the app to try again.</string>
     <string name="issue_insufficient_storage">Not enough free storage: about %1$s needed, %2$s available.</string>
+    <string name="preview_play">Play</string>
+    <string name="preview_pause">Pause</string>
+    <string name="preview_seek">Seek</string>
+    <string name="preview_time">%1$s / %2$s</string>
+    <string name="preview_error_open">The video could not be opened for preview.</string>
+    <string name="preview_error_unsupported">This video cannot be previewed on this device. You can still convert it.</string>
+    <string name="preview_error_generic">The preview could not be played.</string>
 </resources>
