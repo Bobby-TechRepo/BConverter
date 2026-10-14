@@ -1,6 +1,7 @@
 package io.bsoft.bconverter.media.player
 
 import androidx.test.platform.app.InstrumentationRegistry
+import io.bsoft.bconverter.IntegrationFixtures
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
 import java.io.File
@@ -18,19 +19,13 @@ class Media3PlayerEngineTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val dir = File(context.cacheDir, "player").apply { mkdirs() }
-    private val sample = File(dir, "sample.mp4")
+    private val sample: File by lazy { IntegrationFixtures.sampleMp4(context) }
     private lateinit var controller: PlaybackController
 
     /** A stalled test must fail, not hang the whole device run. */
     @get:Rule val timeout: Timeout = Timeout(90, TimeUnit.SECONDS)
 
     @Before fun setUp() {
-        sample.delete()
-        val session = FFmpegKit.executeWithArguments(arrayOf(
-            "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=320x240:rate=15", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
-            "-c:v", "mpeg4", "-c:a", "aac", "-shortest", sample.absolutePath,
-        ))
-        assertTrue("fixture generation failed: ${session.output}", ReturnCode.isSuccess(session.returnCode))
         instrumentation.runOnMainSync { controller = PlaybackController(Media3PlayerEngine(context)) }
     }
 

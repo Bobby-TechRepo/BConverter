@@ -1,6 +1,7 @@
 package io.bsoft.bconverter.media.ffmpeg
 
 import androidx.test.platform.app.InstrumentationRegistry
+import io.bsoft.bconverter.IntegrationFixtures
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
 import io.bsoft.bconverter.domain.model.AudioExtractionMode
@@ -29,18 +30,9 @@ import org.junit.Test
  */
 class FfmpegKitIntegrationTest {
     private val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "it").apply { mkdirs() }
-    private val sample = File(dir, "sample.mp4")
+    private val sample: File by lazy { IntegrationFixtures.sampleMp4(InstrumentationRegistry.getInstrumentation().targetContext) }
     private val probe = FfmpegKitFfprobeRunner(Dispatchers.IO)
     private val parser = FfprobeJsonParser()
-
-    @Before fun makeFixture() {
-        sample.delete()
-        val session = FFmpegKit.executeWithArguments(arrayOf(
-            "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=320x240:rate=15", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
-            "-c:v", "mpeg4", "-c:a", "aac", "-shortest", sample.absolutePath,
-        ))
-        assertTrue("fixture generation failed: ${session.output}", ReturnCode.isSuccess(session.returnCode))
-    }
 
     private fun metadataOf(file: File): MediaMetadata = runBlocking {
         val run = probe.run(file) as FfprobeRunResult.Success
@@ -57,7 +49,7 @@ class FfmpegKitIntegrationTest {
         val m = metadataOf(sample)
         assertEquals(ContainerFormat.MP4, m.container)
         assertEquals("mpeg4", m.videoStreams.single().codec); assertEquals("aac", m.audioStreams.single().codec)
-        assertEquals(320, m.videoStreams.single().width)
+        assertEquals(160, m.videoStreams.single().width)
         assertTrue("duration ${m.durationMs}", m.durationMs in 1500..2600)
     }
 

@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
+import io.bsoft.bconverter.IntegrationFixtures
 import io.bsoft.bconverter.app.BConverterApplication
 import io.bsoft.bconverter.domain.model.AudioExtractionMode
 import io.bsoft.bconverter.domain.model.AudioExtractionSettings
@@ -34,12 +35,7 @@ class ExportEndToEndTest {
     private val dir = File(context.cacheDir, "e2e").apply { mkdirs() }
 
     @Test fun an_audio_extraction_runs_in_the_background_and_is_saved() {
-        val sample = File(dir, "sample.mp4").apply { delete() }
-        val gen = FFmpegKit.executeWithArguments(arrayOf(
-            "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=320x240:rate=15", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
-            "-c:v", "mpeg4", "-c:a", "aac", "-shortest", sample.absolutePath,
-        ))
-        assertTrue("fixture generation failed: ${gen.output}", ReturnCode.isSuccess(gen.returnCode))
+        val sample = IntegrationFixtures.sampleMp4(context)
         val metadata = runBlocking {
             val run = FfmpegKitFfprobeRunner(Dispatchers.IO).run(sample) as FfprobeRunResult.Success
             (FfprobeJsonParser().parse(run.json) as FfprobeParseResult.Parsed).metadata
