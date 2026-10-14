@@ -59,6 +59,12 @@ class Media3PlayerEngine(context: Context) : PlayerEngine {
     override fun setListener(listener: PlayerEngineListener?) { this.listener = listener }
 
     override fun prepare(file: File) {
+        if (!file.canRead()) {
+            // Fail fast: a missing/unreadable local file would otherwise sit in the loader's retry/backoff first.
+            exoPlayer.stop()
+            handler.post { listener?.onError(PlaybackError.SourceNotFound) }
+            return
+        }
         exoPlayer.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
         exoPlayer.prepare()
     }
