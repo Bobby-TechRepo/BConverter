@@ -70,3 +70,10 @@ Not done: re-attaching a new screen to a running job, retry-from-notification, a
 `PreviewPlayer` + `PreviewControls` show the staged source on both options screens (pause on app stop, released on leave).
 Media3 is pinned to 1.5.1 to match compileSdk 35; bump with compileSdk later. This is also the base for the editor's preview.
 Next: timeline model and operations (split/trim/delete/move/speed) with undo/redo, then rendering.
+
+## Phases 8-10 — Editor core (done, pure logic)
+`domain/timeline`: immutable `Timeline` (gap-free video track + overlapping-capable audio tracks, derived clip durations),
+`TimelineOperations` (split, trim, delete, insert, move, speed, volume, replace; typed `EditError`s), command objects with
+snapshot undo/redo and a size-limited `CommandHistory`, and `DefaultTimelineEditor` (selection, playhead, undo/redo state).
+No Android or FFmpeg dependencies. Next: timeline-to-preview mapping (Phase 11), the Compose timeline UI, project persistence,
+and rendering (Phase 12: RenderPlanner -> FFmpeg filter graph).
