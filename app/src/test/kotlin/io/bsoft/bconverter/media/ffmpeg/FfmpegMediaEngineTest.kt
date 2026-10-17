@@ -14,12 +14,15 @@ import io.bsoft.bconverter.domain.model.VideoPlan
 import io.bsoft.bconverter.fakes.FakeFfmpegExecutor
 import io.bsoft.bconverter.fakes.FakeFfprobeRunner
 import io.bsoft.bconverter.fakes.FakeInputResolver
+import io.bsoft.bconverter.domain.timeline.Timeline
+import io.bsoft.bconverter.fakes.TL
 import io.bsoft.bconverter.fakes.TestMedia
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
 import io.bsoft.bconverter.media.api.MediaEngineException
 import io.bsoft.bconverter.media.api.MediaProcessingProgress
 import io.bsoft.bconverter.media.api.MediaProcessingResult
+import io.bsoft.bconverter.media.api.RenderOutput
 import java.io.File
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -144,6 +147,40 @@ class FfmpegMediaEngineTest {
         val first = async { engine.observeProgress("job-1").first() }
         runCurrent()
         engine.extractAudio(req)
+        assertEquals(MediaProcessingProgress(2500, 10_000, 0.25f, 2.0, 3750), first.await())
+    }
+
+    // ---- rendering ----
+    private fun project(id: String = "proj-1") = TL.project(TL.timeline(TL.video("a", 10_000))).copy(id = id)
+    private fun renderOutput() = RenderOutput(File(tmp.root, "final.mp4"))
+
+    @Test fun rendering_runs_the_built_command_under_the_project_id() = runTest {
+        val out = renderOutput().also { it.file.writeText("data") }
+        engine.render(project(), out)
+        val expected = DefaultFfmpegCommandBuilder().buildRenderCommand(project(), out).toArguments()
+        assertEquals(listOf(FakeFfmpegExecutor.Call("proj-1", expected)), executor.calls)
+    }
+
+    @Test fun a_render_with_an_output_file_is_success() = runTest {
+        val out = renderOutput().also { it.file.writeText("data") }
+        assertEquals(MediaProcessingResult.Success(out.file), engine.render(project(), out))
+    }
+
+    @Test fun a_render_without_an_output_file_is_a_failure() = runTest {
+        assertTrue(engine.render(project(), renderOutput()) is MediaProcessingResult.Failure)
+    }
+
+    @Test fun a_project_that_cannot_be_planned_fails_without_running_ffmpeg() = runTest {
+        assertTrue(engine.render(project().copy(timeline = Timeline()), renderOutput()) is MediaProcessingResult.Failure)
+        assertTrue(executor.calls.isEmpty())
+    }
+
+    @Test fun render_progress_is_measured_against_the_project_duration() = runTest {
+        val out = renderOutput().also { it.file.writeText("data") }
+        executor.statistics = listOf(2500L to 2.0)
+        val first = async { engine.observeProgress("proj-1").first() }
+        runCurrent()
+        engine.render(project(), out)
         assertEquals(MediaProcessingProgress(2500, 10_000, 0.25f, 2.0, 3750), first.await())
     }
 }

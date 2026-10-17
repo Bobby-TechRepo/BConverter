@@ -1,6 +1,7 @@
 package io.bsoft.bconverter.fakes
 
 import io.bsoft.bconverter.domain.model.*
+import io.bsoft.bconverter.domain.timeline.VideoProject
 import io.bsoft.bconverter.media.api.*
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
