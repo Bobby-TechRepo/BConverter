@@ -66,7 +66,6 @@ class FfmpegMediaEngine(
 
     override suspend fun cancel(jobId: String) = executor.cancel(jobId)
 
-    // Implemented with the timeline UI: thumbnails.
     /** The project id is the job id for progress and cancellation. */
     override suspend fun render(project: VideoProject, output: RenderOutput): MediaProcessingResult {
         val plan = (RenderPlanner.plan(project) as? RenderPlanResult.Success)?.plan
@@ -74,6 +73,7 @@ class FfmpegMediaEngine(
         return execute(project.id, commandBuilder().buildRenderCommand(project, output).toArguments(), plan.durationMs, output.file)
     }
 
+    // Arrives with the timeline UI.
     override suspend fun generateThumbnail(source: MediaSource, positionMs: Long): Thumbnail =
         throw UnsupportedOperationException("Thumbnails arrive with the timeline")
 }
