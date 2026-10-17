@@ -6,6 +6,7 @@ import io.bsoft.bconverter.domain.model.ConversionSettings
 import io.bsoft.bconverter.domain.model.MediaSource
 import io.bsoft.bconverter.domain.model.ProbeFailure
 import io.bsoft.bconverter.domain.model.ResolvedInput
+import io.bsoft.bconverter.domain.timeline.VideoProject
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 
@@ -26,7 +27,6 @@ data class AudioExtractionRequest(
     val outputFile: File,
     val settings: AudioExtractionSettings,
 )
-data class VideoProject(val id: String, val name: String)
 data class RenderOutput(val file: File)
 data class Thumbnail(val positionMs: Long, val file: File)
 

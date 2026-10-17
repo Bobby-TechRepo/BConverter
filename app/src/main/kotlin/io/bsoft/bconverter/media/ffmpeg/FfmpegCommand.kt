@@ -1,6 +1,8 @@
 package io.bsoft.bconverter.media.ffmpeg
 
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
+import io.bsoft.bconverter.media.api.RenderOutput
+import io.bsoft.bconverter.domain.timeline.VideoProject
 import io.bsoft.bconverter.media.api.ConversionRequest
 
 /** Ordered option list, so tests can assert on structure instead of fragile strings. */
@@ -30,4 +32,7 @@ interface FfmpegCommandBuilder {
     fun buildConversionCommand(request: ConversionRequest): FfmpegCommand
 
     fun buildAudioExtractionCommand(request: AudioExtractionRequest): FfmpegCommand
+
+    /** Throws [IllegalArgumentException] if the project cannot be planned; callers validate with `RenderPlanner` first. */
+    fun buildRenderCommand(project: VideoProject, output: RenderOutput): FfmpegCommand
 }

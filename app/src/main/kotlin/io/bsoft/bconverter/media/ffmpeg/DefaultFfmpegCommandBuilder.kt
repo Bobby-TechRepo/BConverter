@@ -9,7 +9,13 @@ import io.bsoft.bconverter.domain.model.VideoCodec
 import io.bsoft.bconverter.domain.model.VideoPlan
 import io.bsoft.bconverter.domain.model.VideoQuality
 import io.bsoft.bconverter.domain.model.VideoSettings
+import io.bsoft.bconverter.domain.render.FilterGraphBuilder
+import io.bsoft.bconverter.domain.render.RenderNumbers
+import io.bsoft.bconverter.domain.render.RenderPlanResult
+import io.bsoft.bconverter.domain.render.RenderPlanner
+import io.bsoft.bconverter.domain.timeline.VideoProject
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
+import io.bsoft.bconverter.media.api.RenderOutput
 import io.bsoft.bconverter.media.api.ConversionRequest
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -104,7 +110,48 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
         AudioFormat.OPUS -> "opus"
     }
 
-    private fun videoOptions(o: MutableList<Pair<String, String?>>, s: VideoSettings, container: ContainerFormat) {
+    override fun buildRenderCommand(project: VideoProject, output: RenderOutput): FfmpegCommand {
+        val plan = when (val result = RenderPlanner.plan(project)) {
+            is RenderPlanResult.Success -> result.plan
+            is RenderPlanResult.Failure -> throw IllegalArgumentException("The project cannot be rendered: ${result.error}")
+        }
+        val graph = FilterGraphBuilder.build(plan)
+        val export = project.export
+        val o = mutableListOf<Pair<String, String?>>()
+
+        o += "-f" to formatName(export.container)
+        o += "-filter_complex" to graph.render()
+        o += "-map" to "[${graph.videoOutput}]"
+        graph.audioOutput?.let { o += "-map" to "[$it]" }
+        // Canvas size and frame rate are applied inside the filter graph, not as output options.
+        videoOptions(o, export.video, export.container, applyScaleAndRate = false)
+        val audio = export.audio
+        if (graph.audioOutput != null && audio != null) {
+            o += "-c:a" to requireNotNull(encoders.audio[audio.codec]) { "No encoder name for ${audio.codec}" }
+            audio.bitrateKbps?.let { o += "-b:a" to "${it}k" }
+            audio.sampleRateHz?.let { o += "-ar" to it.toString() }
+            audio.channels?.let { o += "-ac" to it.toString() }
+        } else {
+            o += "-an" to null
+        }
+        if (export.container in FASTSTART_CONTAINERS) o += "-movflags" to "+faststart"
+        o += "-t" to RenderNumbers.seconds(plan.durationMs) // audio running past the video is cut
+
+        return FfmpegCommand(
+            globalOptions = listOf("-y", "-hide_banner"),
+            inputs = plan.inputs.map { input ->
+                val options = mutableListOf<Pair<String, String?>>()
+                if (input.seekMs > 0) options += "-ss" to RenderNumbers.seconds(input.seekMs)
+                options += "-t" to RenderNumbers.seconds(input.durationMs)
+                FfmpegInput(input.file.absolutePath, FfmpegOptions(options))
+            },
+            output = FfmpegOutput(output.file.absolutePath, FfmpegOptions(o)),
+        )
+    }
+
+    private fun videoOptions(
+        o: MutableList<Pair<String, String?>>, s: VideoSettings, container: ContainerFormat, applyScaleAndRate: Boolean = true,
+    ) {
         o += "-c:v" to requireNotNull(encoders.video[s.codec]) { "No encoder name for ${s.codec}" }
         when (val q = s.quality) {
             is VideoQuality.Crf -> {
@@ -113,8 +160,10 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
             }
             is VideoQuality.Bitrate -> o += "-b:v" to "${q.kbps}k"
         }
-        s.resolution?.let { o += "-vf" to "scale=${it.width}:${it.height}" }
-        s.frameRate?.let { o += "-r" to formatFrameRate(it) }
+        if (applyScaleAndRate) {
+            s.resolution?.let { o += "-vf" to "scale=${it.width}:${it.height}" }
+            s.frameRate?.let { o += "-r" to formatFrameRate(it) }
+        }
         o += "-pix_fmt" to (s.pixelFormat ?: DEFAULT_PIXEL_FORMAT)
         s.profile?.let { o += "-profile:v" to it }
         s.level?.let { o += "-level" to it }

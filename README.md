@@ -77,3 +77,11 @@ Next: timeline model and operations (split/trim/delete/move/speed) with undo/red
 snapshot undo/redo and a size-limited `CommandHistory`, and `DefaultTimelineEditor` (selection, playhead, undo/redo state).
 No Android or FFmpeg dependencies. Next: timeline-to-preview mapping (Phase 11), the Compose timeline UI, project persistence,
 and rendering (Phase 12: RenderPlanner -> FFmpeg filter graph).
+
+## Phase 12 — Rendering (done, needs device verification)
+`domain/render`: `RenderPlanner` (project -> `RenderPlan`: inputs with seek/duration, canvas, audio layout, overlays),
+`FilterGraphBuilder` (per-clip scale/pad/setpts/fps chains + concat; per-clip audio with chained `atempo`, generated silence for clips
+without audio, overlays with volume/delay, `amix` without rescaling), `DefaultFfmpegCommandBuilder.buildRenderCommand`,
+`FfmpegMediaEngine.render` (project id = job id). Audio running past the video is cut; sources must be staged files.
+Device tests render real projects (trim + speed + overlay, slow-down, audio replacement, silent) and verify with ffprobe.
+Next: export job for projects (WorkManager), timeline-to-preview mapping (Phase 11), timeline UI, project persistence.

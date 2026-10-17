@@ -4,6 +4,9 @@ import io.bsoft.bconverter.data.media.MediaProber
 import io.bsoft.bconverter.domain.model.MediaMetadata
 import io.bsoft.bconverter.domain.model.MediaSource
 import io.bsoft.bconverter.domain.model.ProbeOutcome
+import io.bsoft.bconverter.domain.render.RenderPlanResult
+import io.bsoft.bconverter.domain.render.RenderPlanner
+import io.bsoft.bconverter.domain.timeline.VideoProject
 import io.bsoft.bconverter.domain.repository.InputResolver
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
@@ -13,7 +16,6 @@ import io.bsoft.bconverter.media.api.MediaProcessingProgress
 import io.bsoft.bconverter.media.api.MediaProcessingResult
 import io.bsoft.bconverter.media.api.RenderOutput
 import io.bsoft.bconverter.media.api.Thumbnail
-import io.bsoft.bconverter.media.api.VideoProject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.channels.BufferOverflow
@@ -64,9 +66,13 @@ class FfmpegMediaEngine(
 
     override suspend fun cancel(jobId: String) = executor.cancel(jobId)
 
-    // Implemented in later phases (12: rendering, timeline: thumbnails).
-    override suspend fun render(project: VideoProject, output: RenderOutput): MediaProcessingResult =
-        throw UnsupportedOperationException("Rendering arrives in Phase 12")
+    // Implemented with the timeline UI: thumbnails.
+    /** The project id is the job id for progress and cancellation. */
+    override suspend fun render(project: VideoProject, output: RenderOutput): MediaProcessingResult {
+        val plan = (RenderPlanner.plan(project) as? RenderPlanResult.Success)?.plan
+            ?: return MediaProcessingResult.Failure("The project cannot be rendered")
+        return execute(project.id, commandBuilder().buildRenderCommand(project, output).toArguments(), plan.durationMs, output.file)
+    }
 
     override suspend fun generateThumbnail(source: MediaSource, positionMs: Long): Thumbnail =
         throw UnsupportedOperationException("Thumbnails arrive with the timeline")
