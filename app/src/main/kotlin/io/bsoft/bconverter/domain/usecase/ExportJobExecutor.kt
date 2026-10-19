@@ -39,7 +39,7 @@ class ExportJobExecutor(
             job.outputFile.delete()
             registry.update(jobId, status)
             if (registry.isDetached(jobId)) {
-                resolver.release(job.input)
+                job.inputs.forEach { resolver.release(it) }
                 registry.remove(jobId)
             }
         }
@@ -49,6 +49,7 @@ class ExportJobExecutor(
         when (val task = job.task) {
             is ExportTask.Convert -> session.run(task.request, releaseInput = false)
             is ExportTask.Extract -> session.runExtraction(task.request, releaseInput = false)
+            is ExportTask.Render -> session.runRender(task.project, task.outputFile, task.inputs, releaseInput = false)
         }
         return when (session.state.value) {
             ProcessingState.Completed -> {

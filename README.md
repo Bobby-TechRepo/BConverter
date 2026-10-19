@@ -85,3 +85,9 @@ without audio, overlays with volume/delay, `amix` without rescaling), `DefaultFf
 `FfmpegMediaEngine.render` (project id = job id). Audio running past the video is cut; sources must be staged files.
 Device tests render real projects (trim + speed + overlay, slow-down, audio replacement, silent) and verify with ffprobe.
 Next: export job for projects (WorkManager), timeline-to-preview mapping (Phase 11), timeline UI, project persistence.
+
+## Phase 13b — Project export jobs (done)
+`ExportTask.Render` runs a project through the same registry/executor/WorkManager path as conversions (foreground notification,
+cancel, temp-file clean-up, releases every staged input when detached). `StorageEstimator.estimateRender` and `ProjectExporter`
+(plan check + storage check + queue) are what the editor's Export button will call. Next: editor ViewModel, preview mapping
+(Phase 11), timeline UI, project persistence.

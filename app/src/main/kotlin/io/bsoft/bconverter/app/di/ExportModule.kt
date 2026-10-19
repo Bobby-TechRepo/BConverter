@@ -14,6 +14,7 @@ import io.bsoft.bconverter.domain.repository.OutputPublisher
 import io.bsoft.bconverter.domain.usecase.ExportJobExecutor
 import io.bsoft.bconverter.domain.usecase.ExportJobLauncher
 import io.bsoft.bconverter.domain.usecase.ExportRegistry
+import io.bsoft.bconverter.domain.usecase.ProjectExporter
 import io.bsoft.bconverter.domain.usecase.StorageGuard
 import io.bsoft.bconverter.feature.export.AndroidExportNotifier
 import io.bsoft.bconverter.feature.export.ExportNotifier
@@ -39,6 +40,10 @@ object ExportModule {
 
     @Provides @Singleton
     fun exportNotifier(@ApplicationContext context: Context): ExportNotifier = AndroidExportNotifier(context)
+
+    @Provides @Singleton
+    fun projectExporter(staging: StagingDirectory, storage: StorageGuard, launcher: ExportJobLauncher): ProjectExporter =
+        ProjectExporter(staging, storage, launcher)
 
     @Provides @Singleton
     fun exportLauncher(registry: ExportRegistry, scheduler: ExportScheduler): ExportJobLauncher = ExportJobLauncher(registry, scheduler)

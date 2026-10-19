@@ -5,10 +5,12 @@ import io.bsoft.bconverter.domain.model.ProcessingState
 import io.bsoft.bconverter.domain.model.ProcessingTransitions
 import io.bsoft.bconverter.domain.model.ResolvedInput
 import io.bsoft.bconverter.domain.repository.InputResolver
+import io.bsoft.bconverter.domain.timeline.VideoProject
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
 import io.bsoft.bconverter.media.api.MediaEngine
 import io.bsoft.bconverter.media.api.MediaProcessingResult
+import io.bsoft.bconverter.media.api.RenderOutput
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -38,14 +40,18 @@ class ConversionSession(
      * With [releaseInput] false the caller keeps ownership of the staged input (e.g. to allow a retry).
      */
     suspend fun run(request: ConversionRequest, releaseInput: Boolean = true) =
-        runJob(request.jobId, request.input, request.outputFile, releaseInput) { engine.convert(request) }
+        runJob(request.jobId, listOf(request.input), request.outputFile, releaseInput) { engine.convert(request) }
 
     suspend fun runExtraction(request: AudioExtractionRequest, releaseInput: Boolean = true) =
-        runJob(request.jobId, request.input, request.outputFile, releaseInput) { engine.extractAudio(request) }
+        runJob(request.jobId, listOf(request.input), request.outputFile, releaseInput) { engine.extractAudio(request) }
+
+    /** Renders a project; its id is the engine job id (use a unique id per render). */
+    suspend fun runRender(project: VideoProject, output: File, inputs: List<ResolvedInput>, releaseInput: Boolean = true) =
+        runJob(project.id, inputs, output, releaseInput) { engine.render(project, RenderOutput(output)) }
 
     private suspend fun runJob(
         jobId: String,
-        input: ResolvedInput,
+        inputs: List<ResolvedInput>,
         outputFile: File,
         releaseInput: Boolean,
         execute: suspend () -> MediaProcessingResult,
@@ -76,7 +82,7 @@ class ConversionSession(
             transitionIfRunning(ProcessingEvent.Fail(FAILED_MESSAGE))
         } finally {
             activeJobId = null
-            if (releaseInput) resolver.release(input)
+            if (releaseInput) inputs.forEach { resolver.release(it) }
         }
     }
 
