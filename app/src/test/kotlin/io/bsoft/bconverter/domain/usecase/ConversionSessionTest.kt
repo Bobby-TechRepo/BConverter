@@ -11,6 +11,7 @@ import io.bsoft.bconverter.domain.model.ResolvedInput
 import io.bsoft.bconverter.domain.model.VideoPlan
 import io.bsoft.bconverter.fakes.FakeInputResolver
 import io.bsoft.bconverter.fakes.FakeMediaEngine
+import io.bsoft.bconverter.fakes.TL
 import io.bsoft.bconverter.fakes.TestMedia
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
@@ -179,5 +180,19 @@ class ConversionSessionTest {
         session.cancel(); job.join()
         assertEquals(listOf("job-2"), engine.cancelledJobIds)
         assertEquals(ProcessingState.Cancelled, session.state.value); assertFalse(output.exists()); assertTrue(resolver.released.isEmpty())
+    }
+
+    // ---- project renders ----
+    @Test fun a_render_completes_and_releases_every_input() = runTest {
+        val second = ResolvedInput(tmp.newFile("in2.mp4"), "in2.mp4", 10, true)
+        session.runRender(TL.project(TL.timeline(TL.video("a"))), output, listOf(input, second))
+        assertEquals(ProcessingState.Completed, session.state.value); assertEquals(listOf(input, second), resolver.released)
+        assertEquals(1, engine.rendered.size)
+    }
+
+    @Test fun a_failed_render_removes_the_partial_output_and_can_keep_the_inputs() = runTest {
+        engine.processingResult = MediaProcessingResult.Failure("x")
+        session.runRender(TL.project(TL.timeline(TL.video("a"))), output, listOf(input), releaseInput = false)
+        assertTrue(session.state.value is ProcessingState.Failed); assertFalse(output.exists()); assertTrue(resolver.released.isEmpty())
     }
 }

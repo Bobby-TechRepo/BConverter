@@ -15,6 +15,8 @@ import io.bsoft.bconverter.domain.model.VideoCodec
 import io.bsoft.bconverter.domain.model.VideoPlan
 import io.bsoft.bconverter.domain.model.VideoQuality
 import io.bsoft.bconverter.domain.model.VideoSettings
+import io.bsoft.bconverter.domain.timeline.Timeline
+import io.bsoft.bconverter.fakes.TL
 import io.bsoft.bconverter.fakes.TestMedia
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -75,4 +77,27 @@ class StorageEstimatorTest {
         val two = MediaMetadata(10_000, ContainerFormat.MKV, audioStreams = listOf(AudioStream(1, "aac", 48000, 2, 128_000), AudioStream(2, "aac", 48000, 2, 256_000)))
         assertAbout(336_000, StorageEstimator.estimateExtraction(extract(AudioFormat.M4A, AudioExtractionMode.Copy, stream = 1), two, input))
     }
+
+    // ---- project renders: two 10 s clips = 20 s; video bitrate unknown in the fixtures, so CRF assumes 4 Mbps ----
+    private fun two() = TL.timeline(TL.video("a", 10_000), TL.video("b", 10_000))
+    private fun export(video: VideoSettings, audio: AudioSettings? = AudioSettings(AudioCodec.AAC, 128)) = TL.exportSettings(video, audio)
+    private val crf = VideoSettings(VideoCodec.H264, VideoQuality.Crf(23))
+
+    @Test fun a_crf_render_assumes_the_source_video_bitrate() =
+        assertAbout(10_836_000, StorageEstimator.estimateRender(TL.project(two(), export(crf))))
+
+    @Test fun a_bitrate_render_uses_that_bitrate() =
+        assertAbout(5_586_000, StorageEstimator.estimateRender(TL.project(two(), export(VideoSettings(VideoCodec.H264, VideoQuality.Bitrate(2000))))))
+
+    @Test fun a_smaller_canvas_shrinks_a_crf_render_with_its_pixel_count() =
+        assertAbout(2_961_000, StorageEstimator.estimateRender(TL.project(two(), export(crf.copy(resolution = Resolution(960, 540))))))
+
+    @Test fun a_silent_render_has_no_audio_share() =
+        assertAbout(10_500_000, StorageEstimator.estimateRender(TL.project(two(), export(crf, audio = null))))
+
+    @Test fun speed_changes_shorten_the_estimate() =
+        assertAbout(2_709_000, StorageEstimator.estimateRender(TL.project(TL.timeline(TL.video("a", 10_000, speed = 2f)), export(crf))))
+
+    @Test fun a_project_that_cannot_be_rendered_needs_no_space() =
+        assertEquals(0L, StorageEstimator.estimateRender(TL.project(Timeline(), export(crf))))
 }

@@ -17,6 +17,7 @@ import io.bsoft.bconverter.domain.repository.PublishResult
 import io.bsoft.bconverter.fakes.FakeInputResolver
 import io.bsoft.bconverter.fakes.FakeMediaEngine
 import io.bsoft.bconverter.fakes.FakeOutputPublisher
+import io.bsoft.bconverter.fakes.TL
 import io.bsoft.bconverter.fakes.TestMedia
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
 import io.bsoft.bconverter.media.api.ConversionRequest
@@ -157,5 +158,47 @@ class ExportJobExecutorTest {
         engine.processingResult = MediaProcessingResult.Failure("x"); convertJob(); registry.detach("job-1")
         executor.execute("job-1")
         assertEquals(listOf(input), resolver.released); assertNull(registry.job("job-1"))
+    }
+
+    // ---- project renders ----
+    private lateinit var second: ResolvedInput
+    private fun renderJob(id: String = "job-1"): ExportJob {
+        if (!::second.isInitialized) second = ResolvedInput(tmp.newFile("in2.mp4"), "in2.mp4", 10, true)
+        return ExportJob(id, "my project", ExportTask.Render(TL.project(TL.timeline(TL.video("a", 10_000))), output, listOf(input, second)), destination)
+            .also { registry.register(it) }
+    }
+
+    @Test fun a_project_render_is_run_published_and_cleaned_up() = runTest {
+        engine.onRender = { _, out -> out.file.writeText("rendered") }
+        val job = renderJob()
+        assertEquals(JobStatus.Completed, executor.execute("job-1"))
+        assertEquals(job.task.let { (it as ExportTask.Render).project }, engine.rendered.single().first)
+        assertEquals(output, engine.rendered.single().second.file)
+        assertEquals("rendered", publisher.published.single().content); assertFalse(output.exists())
+    }
+
+    @Test fun a_failed_render_fails_the_job_without_publishing() = runTest {
+        engine.processingResult = MediaProcessingResult.Failure("boom"); renderJob()
+        assertEquals(JobStatus.Failed(JobFailure.ConversionFailed), executor.execute("job-1"))
+        assertTrue(publisher.published.isEmpty()); assertFalse(output.exists())
+    }
+
+    @Test fun cancelling_a_render_stops_the_engine_under_the_project_id_and_cleans_up() = runTest {
+        engine.convertGate = CompletableDeferred(); val job = renderJob()
+        val run = launch { executor.execute("job-1") }; runCurrent()
+        run.cancel(); run.join()
+        assertEquals(listOf((job.task as ExportTask.Render).project.id), engine.cancelledJobIds)
+        assertEquals(JobStatus.Cancelled, registry.status("job-1")!!.value); assertFalse(output.exists())
+    }
+
+    @Test fun a_detached_render_releases_every_input() = runTest {
+        engine.onRender = { _, out -> out.file.writeText("r") }; renderJob(); registry.detach("job-1")
+        executor.execute("job-1")
+        assertEquals(listOf(input, second), resolver.released); assertNull(registry.job("job-1"))
+    }
+
+    @Test fun an_attached_render_leaves_its_inputs_to_the_owner() = runTest {
+        engine.onRender = { _, out -> out.file.writeText("r") }; renderJob(); executor.execute("job-1")
+        assertTrue(resolver.released.isEmpty())
     }
 }
