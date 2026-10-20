@@ -37,7 +37,7 @@ class RenderPlannerTest {
 
     @Test fun several_clips_keep_their_order_and_add_up() {
         val p = plan(TL.project(TL.timeline(TL.video("a", 10_000), TL.video("b", 20_000), TL.video("c", 5_000))))
-        assertEquals(listOf("/tmp/a", "/tmp/b", "/tmp/c"), p.inputs.map { it.file.path })
+        assertEquals(listOf("a", "b", "c"), p.inputs.map { it.file.name }) // names, not paths: separators differ on Windows
         assertEquals(listOf(0, 1, 2), p.videoSegments.map { it.inputIndex }); assertEquals(35_000L, p.durationMs)
     }
 

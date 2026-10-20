@@ -12,15 +12,26 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import java.io.File
 
-/** ExoPlayer behind [PlayerEngine]. Create and use on the main thread. */
-class Media3PlayerEngine(context: Context) : PlayerEngine {
+/**
+ * ExoPlayer behind [PlayerEngine]. Create and use on the main thread.
+ * With [audioEnabled] false the audio track is never opened (no audio focus, no output): used by device tests so they
+ * do not depend on the emulator's audio backend, which can stall a whole test run.
+ */
+class Media3PlayerEngine(context: Context, audioEnabled: Boolean = true) : PlayerEngine {
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(context)
         .setAudioAttributes(
             AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
-            /* handleAudioFocus = */ true,
+            /* handleAudioFocus = */ audioEnabled,
         )
-        .setHandleAudioBecomingNoisy(true)
+        .setHandleAudioBecomingNoisy(audioEnabled)
         .build()
+        .also { player ->
+            if (!audioEnabled) {
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                    .build()
+            }
+        }
 
     private val handler = Handler(Looper.getMainLooper())
     private var listener: PlayerEngineListener? = null

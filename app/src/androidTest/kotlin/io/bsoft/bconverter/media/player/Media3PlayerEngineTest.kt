@@ -26,7 +26,7 @@ class Media3PlayerEngineTest {
     @get:Rule val timeout: Timeout = Timeout(90, TimeUnit.SECONDS)
 
     @Before fun setUp() {
-        instrumentation.runOnMainSync { controller = PlaybackController(Media3PlayerEngine(context)) }
+        instrumentation.runOnMainSync { controller = PlaybackController(Media3PlayerEngine(context, audioEnabled = false)) }
     }
 
     /** Always release the player, even when a test fails or times out. */
