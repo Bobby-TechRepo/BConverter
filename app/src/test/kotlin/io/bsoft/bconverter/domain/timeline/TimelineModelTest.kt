@@ -80,4 +80,14 @@ class TimelineModelTest {
         val t = TL.withAudio(Timeline(), listOf(TL.audio("late", start = 9_000)), listOf(TL.audio("early", start = 1_000)))
         assertEquals(listOf("early", "late"), t.audioClips.map { it.id }); assertEquals(2, t.clipCount)
     }
+
+    // ---- source mapping ----
+    @Test fun every_clip_source_can_be_replaced_without_touching_anything_else() {
+        val t = TL.withAudio(TL.timeline(TL.video("a", 10_000, speed = 2f), TL.video("b")), listOf(TL.audio("m", 3_000, start = 500)))
+        val mapped = t.mapSources { TL.source("moved-" + (it as io.bsoft.bconverter.domain.model.MediaSource.FileSource).file.name) }
+        assertEquals(listOf(TL.source("moved-a"), TL.source("moved-b")), mapped.videoClips.map { it.source })
+        assertEquals(TL.source("moved-m"), mapped.audioClips.single().source)
+        assertEquals(t.videoClips.map { it.copy(source = TL.source("x")) }, mapped.videoClips.map { it.copy(source = TL.source("x")) })
+        assertEquals(500L, mapped.audioClips.single().startTimeMs)
+    }
 }

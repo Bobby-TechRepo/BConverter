@@ -11,13 +11,15 @@ class FakeInputResolver : InputResolver {
     var result: ResolveResult = ResolveResult.Success(ResolvedInput(File("/tmp/a.mp4"), "a.mp4", 10, true))
     /** When set, resolve() suspends until completed — lets tests observe the Resolving state. */
     var gate: CompletableDeferred<Unit>? = null
+    /** Per-source results; falls back to [result]. */
+    var resultFor: ((MediaSource) -> ResolveResult)? = null
     val resolved = mutableListOf<MediaSource>()
     val released = mutableListOf<ResolvedInput>()
 
     override suspend fun resolve(source: MediaSource): ResolveResult {
         resolved += source
         gate?.await()
-        return result
+        return resultFor?.invoke(source) ?: result
     }
 
     override fun release(input: ResolvedInput) { released += input }
