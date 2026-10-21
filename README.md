@@ -91,3 +91,10 @@ Next: export job for projects (WorkManager), timeline-to-preview mapping (Phase 
 cancel, temp-file clean-up, releases every staged input when detached). `StorageEstimator.estimateRender` and `ProjectExporter`
 (plan check + storage check + queue) are what the editor's Export button will call. Next: editor ViewModel, preview mapping
 (Phase 11), timeline UI, project persistence.
+
+## Editor core wiring (done, no screen yet)
+`SourceLibrary` (clips reference original content URIs; staged copies serve preview/render; one staging per file),
+`Timeline.mapSources`, `ExportSettingsFactory` (Small/Balanced/High, CRF or bitrate to match the build, canvas cap),
+`UriPermissionPersister`, and `EditorViewModel` (import video/audio, replace, every edit, undo/redo, export as a background
+job that outlives the screen). Next: timeline-to-preview mapping (Phase 11) + the Compose timeline screen, then project
+persistence (Room), recent projects, and tablet layouts.

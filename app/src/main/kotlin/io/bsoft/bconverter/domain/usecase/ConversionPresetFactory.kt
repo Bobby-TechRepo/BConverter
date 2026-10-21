@@ -115,14 +115,8 @@ class ConversionPresetFactory(private val capabilities: MediaCapabilityRepositor
     private companion object {
         const val SMALL_MAX_HEIGHT = 720
         const val DEFAULT_BITRATE_KBPS = 2000
-        val VIDEO_PREFERENCE = listOf(
-            VideoCodec.H264, VideoCodec.HEVC, VideoCodec.VP9, VideoCodec.AV1,
-            VideoCodec.VP8, VideoCodec.MPEG4, VideoCodec.MPEG2,
-        )
-        val AUDIO_PREFERENCE = listOf(
-            AudioCodec.AAC, AudioCodec.OPUS, AudioCodec.MP3, AudioCodec.AC3,
-            AudioCodec.VORBIS, AudioCodec.FLAC, AudioCodec.PCM,
-        )
+        val VIDEO_PREFERENCE = CodecPreferences.VIDEO
+        val AUDIO_PREFERENCE = CodecPreferences.AUDIO
         val LOSSLESS = setOf(AudioCodec.FLAC, AudioCodec.PCM)
     }
 }

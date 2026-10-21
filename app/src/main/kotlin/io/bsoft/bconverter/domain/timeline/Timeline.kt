@@ -85,6 +85,12 @@ data class Timeline(
     val audioClips: List<AudioClip> get() = audioTracks.flatMap { it.clips }.sortedBy { it.startTimeMs }
     val clipCount: Int get() = videoClips.size + audioTracks.sumOf { it.clips.size }
 
+    /** Replaces every clip's source (e.g. original content URIs by staged files); nothing else changes. */
+    fun mapSources(transform: (MediaSource) -> MediaSource): Timeline = copy(
+        videoClips = videoClips.map { it.copy(source = transform(it.source)) },
+        audioTracks = audioTracks.map { track -> track.copy(clips = track.clips.map { it.copy(source = transform(it.source)) }) },
+    )
+
     /** Re-lays the video track so clips sit back to back from time zero. */
     fun normalized(): Timeline {
         var cursor = 0L

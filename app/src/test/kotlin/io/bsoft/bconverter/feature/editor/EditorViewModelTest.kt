@@ -379,4 +379,11 @@ class EditorViewModelTest {
         engine.convertGate!!.complete(MediaProcessingResult.Success(File("x"))); runCurrent()
         assertEquals(listOf(staged2, staged), resolver.released); assertEquals(1, publisher.published.size)
     }
+
+    @Test fun dismissing_clears_the_message_and_the_completed_banner() = runTest(dispatcher) {
+        val vm = withVideo(); exporting(vm)
+        assertEquals(ExportUiState.Completed, vm.state.value.export)
+        vm.dismissMessage()
+        assertEquals(ExportUiState.Idle, vm.state.value.export); assertNull(vm.message)
+    }
 }
