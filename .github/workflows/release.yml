@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Fetching CoMER model files
+      - name: Fetching Glyphs Icons
         run: python tools/icons/fetch_glyphs.py
 
       - name: Set up JDK 21
