@@ -6,10 +6,10 @@ name: Release
 # GitHub release and kept as workflow artifacts.
 #
 # Repository secrets (Settings > Secrets and variables > Actions):
-#   BCOVERTER_KEYSTORE_BASE64   the release keystore, base64-encoded (base64 -w0 release.jks)
-#   BCOVERTER_KEYSTORE_PASSWORD
-#   BCOVERTER_KEY_ALIAS
-#   BCOVERTER_KEY_PASSWORD
+#   BCONVERTER_KEYSTORE_BASE64   the release keystore, base64-encoded (base64 -w0 release.jks)
+#   BCONVERTER_KEYSTORE_PASSWORD
+#   BCONVERTER_KEY_ALIAS
+#   BCONVERTER_KEY_PASSWORD
 
 on:
   push:
@@ -60,23 +60,23 @@ jobs:
 
       - name: Restore the signing key
         env:
-          KEYSTORE_BASE64: ${{ secrets.BCOVERTER_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.BCONVERTER_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::The BCOVERTER_KEYSTORE_BASE64 secret is not set; a release must be signed."
+            echo "::error::The BCONVERTER_KEYSTORE_BASE64 secret is not set; a release must be signed."
             exit 1
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-          echo "BCOVERTER_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "BCONVERTER_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace
 
       - name: Build signed bundle and APK
         env:
-          BMUSIC_KEYSTORE_PASSWORD: ${{ secrets.BCOVERTER_KEYSTORE_PASSWORD }}
-          BMUSIC_KEY_ALIAS: ${{ secrets.BCOVERTER_KEY_ALIAS }}
-          BMUSIC_KEY_PASSWORD: ${{ secrets.BCOVERTER_KEY_PASSWORD }}
+          BMUSIC_KEYSTORE_PASSWORD: ${{ secrets.BCONVERTER_KEYSTORE_PASSWORD }}
+          BMUSIC_KEY_ALIAS: ${{ secrets.BCONVERTER_KEY_ALIAS }}
+          BMUSIC_KEY_PASSWORD: ${{ secrets.BCONVERTER_KEY_PASSWORD }}
         run: >
           ./gradlew :app:bundleRelease :app:assembleRelease --stacktrace
           -PversionName=${{ steps.version.outputs.name }}
