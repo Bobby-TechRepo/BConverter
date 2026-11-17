@@ -32,6 +32,14 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetching CoMER model files
+        run: python tools/icons/fetch_glyphs.py
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -74,9 +82,9 @@ jobs:
 
       - name: Build signed bundle and APK
         env:
-          BMUSIC_KEYSTORE_PASSWORD: ${{ secrets.BCONVERTER_KEYSTORE_PASSWORD }}
-          BMUSIC_KEY_ALIAS: ${{ secrets.BCONVERTER_KEY_ALIAS }}
-          BMUSIC_KEY_PASSWORD: ${{ secrets.BCONVERTER_KEY_PASSWORD }}
+          BCONVERTER_KEYSTORE_PASSWORD: ${{ secrets.BCONVERTER_KEYSTORE_PASSWORD }}
+          BCONVERTER_KEY_ALIAS: ${{ secrets.BCONVERTER_KEY_ALIAS }}
+          BCONVERTER_KEY_PASSWORD: ${{ secrets.BCONVERTER_KEY_PASSWORD }}
         run: >
           ./gradlew :app:bundleRelease :app:assembleRelease --stacktrace
           -PversionName=${{ steps.version.outputs.name }}
@@ -91,14 +99,14 @@ jobs:
       - name: Keep the outputs
         uses: actions/upload-artifact@v4
         with:
-          name: BMusic-${{ steps.version.outputs.name }}
+          name: BConverter-${{ steps.version.outputs.name }}
           path: dist/
 
       - name: Publish a GitHub release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          name: BMusic ${{ steps.version.outputs.name }}
+          name: BConverter ${{ steps.version.outputs.name }}
           body_path: fastlane/metadata/android/en-US/changelogs/default.txt
           files: |
             dist/BConverter-${{ steps.version.outputs.name }}.apk
