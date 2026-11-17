@@ -15,8 +15,8 @@ val releaseSigning: Map<String, String?> = run {
     rootProject.file("keystore.properties").takeIf { it.isFile }?.inputStream()?.use { props.load(it) }
     fun value(key: String, env: String) = props.getProperty(key) ?: System.getenv(env)
     mapOf(
-        "storeFile" to value("storeFile", "BCONVERTER_STORE_FILE"),
-        "storePassword" to value("storePassword", "BCONVERTER_STORE_PASSWORD"),
+        "storeFile" to value("storeFile", "BCONVERTER_KEYSTORE_FILE"),
+        "storePassword" to value("storePassword", "BCONVERTER_KEYSTORE_PASSWORD"),
         "keyAlias" to value("keyAlias", "BCONVERTER_KEY_ALIAS"),
         "keyPassword" to value("keyPassword", "BCONVERTER_KEY_PASSWORD"),
     )
