@@ -33,13 +33,13 @@ object TL {
     /** A video clip taking [spanMs] of its source, played at [speed]. */
     fun video(
         id: String, spanMs: Long = 10_000, speed: Float = 1f, sourceStart: Long = 0,
-        sourceDuration: Long = sourceStart + spanMs, start: Long = 0,
-    ) = VideoClip(id, source(id), sourceDuration, sourceStart, sourceStart + spanMs, speed, start)
+        sourceDuration: Long = sourceStart + spanMs, start: Long = 0, muted: Boolean = false,
+    ) = VideoClip(id, source(id), sourceDuration, sourceStart, sourceStart + spanMs, speed, start, audioMuted = muted)
 
     fun audio(
         id: String, spanMs: Long = 5_000, start: Long = 0, volume: Float = 1f, sourceStart: Long = 0,
-        sourceDuration: Long = sourceStart + spanMs,
-    ) = AudioClip(id, source(id), sourceDuration, sourceStart, sourceStart + spanMs, volume, start)
+        sourceDuration: Long = sourceStart + spanMs, speed: Float = 1f,
+    ) = AudioClip(id, source(id), sourceDuration, sourceStart, sourceStart + spanMs, volume, start, speed)
 
     fun timeline(vararg clips: VideoClip): Timeline = Timeline(videoClips = clips.toList()).normalized()
 
@@ -69,6 +69,6 @@ object TL {
         metadata: (MediaSource) -> MediaMetadata? = { meta() },
     ) = VideoProject(
         "p1", "Project", timeline, export,
-        timeline.videoClips.mapNotNull { c -> metadata(c.source)?.let { c.source to it } }.toMap(),
+        (timeline.videoClips.map { it.source } + timeline.pipClips.map { it.source }).mapNotNull { src -> metadata(src)?.let { src to it } }.toMap(),
     )
 }

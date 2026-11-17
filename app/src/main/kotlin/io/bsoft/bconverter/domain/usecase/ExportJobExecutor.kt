@@ -8,6 +8,11 @@ import io.bsoft.bconverter.domain.model.ProcessingState
 import io.bsoft.bconverter.domain.repository.InputResolver
 import io.bsoft.bconverter.domain.repository.OutputPublisher
 import io.bsoft.bconverter.domain.repository.PublishResult
+import io.bsoft.bconverter.domain.overlay.OverlayLayer
+import io.bsoft.bconverter.domain.overlay.OverlayLayerPreparer
+import io.bsoft.bconverter.domain.render.RenderPlanResult
+import io.bsoft.bconverter.domain.render.RenderPlanner
+import io.bsoft.bconverter.domain.timeline.VideoProject
 import io.bsoft.bconverter.media.api.MediaEngine
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -22,6 +27,8 @@ class ExportJobExecutor(
     private val resolver: InputResolver,
     private val publisher: OutputPublisher,
     private val registry: ExportRegistry,
+    /** Draws text overlays for renders; without it overlays are not drawn. */
+    private val overlays: OverlayLayerPreparer? = null,
 ) {
     suspend fun execute(jobId: String): JobStatus {
         val job = registry.job(jobId) ?: return JobStatus.Failed(JobFailure.Interrupted)
@@ -37,6 +44,7 @@ class ExportJobExecutor(
             return status
         } finally {
             job.outputFile.delete()
+            job.tempFiles.forEach { it.delete() }
             registry.update(jobId, status)
             if (registry.isDetached(jobId)) {
                 job.inputs.forEach { resolver.release(it) }
@@ -45,11 +53,23 @@ class ExportJobExecutor(
         }
     }
 
+    /** The overlay pictures for [project]; empty when it has none; null if one cannot be drawn (the export must not silently lose text). */
+    private suspend fun prepareOverlays(project: VideoProject): List<OverlayLayer>? {
+        if (project.textOverlays.isEmpty()) return emptyList()
+        val preparer = overlays ?: return null
+        val canvas = (RenderPlanner.plan(project) as? RenderPlanResult.Success)?.plan?.canvas ?: return null
+        return preparer.prepare(project.textOverlays, canvas.width, canvas.height)
+    }
+
     private suspend fun run(job: ExportJob, session: ConversionSession): JobStatus {
         when (val task = job.task) {
             is ExportTask.Convert -> session.run(task.request, releaseInput = false)
             is ExportTask.Extract -> session.runExtraction(task.request, releaseInput = false)
-            is ExportTask.Render -> session.runRender(task.project, task.outputFile, task.inputs, releaseInput = false)
+            is ExportTask.ExtractSubtitle -> session.runSubtitleExtraction(task.request, releaseInput = false)
+            is ExportTask.Render -> {
+                val layers = prepareOverlays(task.project) ?: return JobStatus.Failed(JobFailure.OverlaysFailed)
+                session.runRender(task.project, task.outputFile, task.inputs, releaseInput = false, subtitles = task.subtitles, overlays = layers)
+            }
         }
         return when (session.state.value) {
             ProcessingState.Completed -> {

@@ -1,8 +1,12 @@
 package io.bsoft.bconverter.domain.render
 
+import io.bsoft.bconverter.domain.timeline.JoinEffect
+import io.bsoft.bconverter.domain.timeline.TransitionType
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FilterGraphBuilderTest {
@@ -135,5 +139,51 @@ class FilterGraphBuilderTest {
             0.25f to listOf("atempo=0.5", "atempo=0.5"), 1.5f to listOf("atempo=1.5"), 3f to listOf("atempo=2", "atempo=1.5"),
             0.3f to listOf("atempo=0.5", "atempo=0.6"),
         ).forEach { (speed, expected) -> assertEquals("x$speed", expected, AudioTempo.filters(speed)) }
+    }
+
+    // ---- transitions between clips ----
+    private fun joined(vararg joins: JoinEffect, original: Boolean = false): FilterGraph {
+        var start = 0L
+        val segs = joins.mapIndexed { i, j ->
+            val s = start - (if (j.type == TransitionType.CROSSFADE) j.durationMs else 0L)
+            start = s + 6_000; VideoSegment(i, 1f, 6_000, s, j)
+        }
+        val inputs = joins.indices.map { input("c$it", dur = 6_000) }
+        val orig = if (original) joins.indices.map { OriginalAudioSegment(it, 1f, 6_000) } else null
+        return graph(RenderPlan(canvas, inputs, segs, orig, emptyList(), AudioFormatSpec(48_000, 2).takeIf { original }, start))
+    }
+    private val none = JoinEffect.None
+    private fun cross(ms: Long) = JoinEffect(TransitionType.CROSSFADE, ms)
+    private fun dip(ms: Long) = JoinEffect(TransitionType.FADE_BLACK, ms)
+
+    @Test fun joins_without_effects_keep_the_plain_concat() {
+        val g = joined(none, none)
+        assertEquals(FilterChain(listOf("v0", "v1"), listOf("concat=n=2:v=1:a=0"), listOf("vout")), g.chain("vout"))
+    }
+
+    @Test fun a_crossfade_blends_the_runs_with_xfade_at_the_start_of_the_overlap() {
+        val r = joined(none, cross(1_000)).render()
+        assertTrue(r, "xfade=transition=fade:duration=1:offset=5" in r)
+    }
+
+    @Test fun a_fade_through_black_fades_each_side_of_the_cut_without_xfade() {
+        val g = joined(none, dip(1_000))
+        assertEquals("fade=t=out:st=5.5:d=0.5", g.chain("v0").filters.last())
+        assertEquals("fade=t=in:st=0:d=0.5", g.chain("v1").filters.last())
+        assertEquals(listOf("concat=n=2:v=1:a=0"), g.chain("vout").filters)
+        assertFalse(g.render().contains("xfade"))
+    }
+
+    @Test fun original_audio_uses_acrossfade_for_crossfades_and_afade_for_dips() {
+        assertTrue(joined(none, cross(1_000), original = true).render().contains("acrossfade=d=1"))
+        val d = joined(none, dip(1_000), original = true).render()
+        assertTrue(d.contains("afade=t=out:st=5.5:d=0.5"))
+        assertTrue(d.contains("afade=t=in:st=0:d=0.5"))
+        assertFalse(d.contains("acrossfade"))
+    }
+
+    @Test fun an_overlay_with_speed_is_retimed_before_it_is_delayed() {
+        val c = graph(plan(listOf(input("a"), input("m")), listOf(VideoSegment(0, 1f)), overlays = listOf(OverlayAudio(1, 1f, 500, 2f)))).chain("o0")
+        assertEquals(listOf("aformat=sample_rates=48000:channel_layouts=stereo", "asetpts=PTS-STARTPTS", "atempo=2", "adelay=500|500"), c.filters)
     }
 }

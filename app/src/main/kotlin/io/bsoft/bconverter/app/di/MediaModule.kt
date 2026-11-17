@@ -1,5 +1,9 @@
 package io.bsoft.bconverter.app.di
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import io.bsoft.bconverter.media.ffmpeg.FfmpegFailureLog
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,7 +37,8 @@ object MediaModule {
     fun listRunner(@IoDispatcher dispatcher: CoroutineDispatcher): FfmpegListRunner = FfmpegKitListRunner(dispatcher)
 
     @Provides @Singleton
-    fun executor(): FfmpegExecutor = FfmpegKitExecutor()
+    fun executor(@ApplicationContext context: Context): FfmpegExecutor =
+        FfmpegKitExecutor(FfmpegFailureLog(File(context.filesDir, "diagnostics")))
 
     @Provides @Singleton
     fun capabilityProvider(runner: FfmpegListRunner): CapabilityProvider =
@@ -47,9 +52,14 @@ object MediaModule {
 
     @Provides @Singleton
     fun mediaEngine(
+        @ApplicationContext context: Context,
         prober: MediaProber,
         resolver: InputResolver,
         executor: FfmpegExecutor,
         capabilities: CapabilityProvider,
-    ): MediaEngine = FfmpegMediaEngine(prober, resolver, executor) { DefaultFfmpegCommandBuilder(capabilities.encoderNames()) }
+    ): MediaEngine = io.bsoft.bconverter.media.RoutingMediaEngine(
+        FfmpegMediaEngine(prober, resolver, executor) { DefaultFfmpegCommandBuilder(capabilities.encoderNames()) },
+        // Projects the device encoders can render exactly go through Media3 Transformer first (step 19).
+        io.bsoft.bconverter.media.transformer.Media3ProjectRenderer(context),
+    )
 }

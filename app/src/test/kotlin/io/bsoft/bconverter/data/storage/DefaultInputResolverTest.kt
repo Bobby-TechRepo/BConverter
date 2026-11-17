@@ -164,4 +164,53 @@ class DefaultInputResolverTest {
         r.release((r.resolve(MediaSource.FileSource(f)) as ResolveResult.Success).input)
         assertTrue(f.exists())
     }
+
+    // ---- reading in place (implementation plan step 15) ----
+    private class FakeInPlace(private val works: Boolean) : io.bsoft.bconverter.core.storage.InPlaceOpener {
+        val handles = mutableListOf<Handle>()
+        class Handle(override val file: File) : io.bsoft.bconverter.core.storage.InPlaceHandle {
+            var closed = false
+            override fun close() { closed = true; file.delete() }
+        }
+        override fun open(uri: Uri, link: File): io.bsoft.bconverter.core.storage.InPlaceHandle? {
+            if (!works) return null
+            link.parentFile?.mkdirs(); link.writeText("in place")
+            return Handle(link).also { handles += it }
+        }
+    }
+
+    private fun TestScope.inPlaceResolver(opener: FakeInPlace) = DefaultInputResolver(
+        reader = reader, staging = staging, freeSpace = free,
+        ioDispatcher = StandardTestDispatcher(testScheduler), bufferSize = 4, inPlace = opener,
+    )
+
+    @Test fun a_document_that_can_be_read_in_place_is_not_copied() = runTest {
+        reader.put(uri, video(ByteArray(10)))
+        val opener = FakeInPlace(works = true)
+        val input = (inPlaceResolver(opener).resolve(source) as ResolveResult.Success).input
+        assertEquals("in place", input.file.readText()) // the link, not a copy of the 10 bytes
+        assertEquals(staging.root, input.file.parentFile); assertEquals(10L, input.sizeBytes); assertTrue(input.isStaged)
+    }
+
+    @Test fun reading_in_place_needs_no_free_space_for_a_copy() = runTest {
+        reader.put(uri, video(ByteArray(10)))
+        free.available = 0
+        assertTrue(inPlaceResolver(FakeInPlace(works = true)).resolve(source) is ResolveResult.Success)
+    }
+
+    @Test fun when_reading_in_place_is_not_possible_the_document_is_copied() = runTest {
+        val data = ByteArray(10) { it.toByte() }
+        reader.put(uri, video(data))
+        val input = (inPlaceResolver(FakeInPlace(works = false)).resolve(source) as ResolveResult.Success).input
+        assertArrayEquals(data, input.file.readBytes())
+    }
+
+    @Test fun releasing_an_in_place_input_closes_it_and_removes_the_link() = runTest {
+        reader.put(uri, video(ByteArray(10)))
+        val opener = FakeInPlace(works = true)
+        val resolver = inPlaceResolver(opener)
+        val input = (resolver.resolve(source) as ResolveResult.Success).input
+        resolver.release(input)
+        assertTrue(opener.handles.single().closed); assertFalse(input.file.exists())
+    }
 }

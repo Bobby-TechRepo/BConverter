@@ -24,6 +24,10 @@ object StorageEstimator {
     private const val DEFAULT_AUDIO_BPS = 128_000.0
     private const val LOSSLESS_AUDIO_BPS = 1_411_000.0 // CD-quality PCM
     private const val DEFAULT_RENDER_VIDEO_BPS = 4_000_000.0
+    /** Parts (~2×) plus their joined copy (~2×) plus the export itself (1×). */
+    private const val SEGMENTED_SPACE_FACTOR = 5.0
+    /** 48 kHz stereo 16-bit PCM. */
+    private const val PCM_BPS = 1_536_000.0
     private val LOSSLESS = setOf(AudioCodec.FLAC, AudioCodec.PCM)
 
     fun estimateConversion(settings: ConversionSettings, metadata: MediaMetadata, inputSizeBytes: Long): Long {
@@ -82,7 +86,11 @@ object StorageEstimator {
             }
         }
         val audioBytes = export.audio?.let { encodedAudioBps(it.codec, it.bitrateKbps) / 8.0 * seconds } ?: 0.0
-        return ((videoBytes + audioBytes) * OVERHEAD).toLong()
+        // A long project is rendered in parts (step 18): at the peak, the parts and their joined copy (each at about twice
+        // the export's bitrate, with PCM sound) are on disk next to the export.
+        val partsFactor = if (io.bsoft.bconverter.domain.render.SegmentedRender.needsParts(project)) SEGMENTED_SPACE_FACTOR else 1.0
+        val partSound = if (partsFactor > 1.0 && export.audio != null) PCM_BPS / 8.0 * seconds * 2 else 0.0
+        return ((videoBytes + audioBytes) * OVERHEAD * partsFactor + partSound).toLong()
     }
 
     private fun encodedAudioBps(codec: AudioCodec, kbps: Int?): Double =

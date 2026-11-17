@@ -112,9 +112,8 @@ class TimelineOperationsTest {
         }
     }
 
-    @Test fun only_video_clips_have_a_speed() {
+    @Test fun unknown_clips_have_no_speed() {
         val t = TL.withAudio(three(), listOf(TL.audio("m")))
-        assertEquals(EditError.WrongClipType, err(ops.changeSpeed(t, "m", 2f)))
         assertEquals(EditError.ClipNotFound("x"), err(ops.changeSpeed(t, "x", 2f)))
     }
 

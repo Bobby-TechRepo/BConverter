@@ -18,11 +18,16 @@ import io.bsoft.bconverter.domain.model.MediaSource
 import io.bsoft.bconverter.domain.model.ProbeFailure
 import io.bsoft.bconverter.domain.model.ProbeOutcome
 import io.bsoft.bconverter.domain.model.ProcessingState
+import io.bsoft.bconverter.domain.model.SavedOutput
 import io.bsoft.bconverter.domain.model.ResolvedInput
 import io.bsoft.bconverter.domain.model.VideoCodec
 import io.bsoft.bconverter.domain.repository.CapabilitySource
 import io.bsoft.bconverter.domain.repository.InputResolver
 import io.bsoft.bconverter.domain.repository.MediaCapabilityRepository
+import io.bsoft.bconverter.domain.usecase.AdvancedChoices
+import io.bsoft.bconverter.domain.usecase.AdvancedOptions
+import io.bsoft.bconverter.domain.usecase.AdvancedOptionsApplier
+import io.bsoft.bconverter.domain.model.VideoPlan
 import io.bsoft.bconverter.domain.usecase.ConversionPresetFactory
 import io.bsoft.bconverter.domain.usecase.ConversionRequestValidator
 import io.bsoft.bconverter.domain.usecase.ExportJobLauncher
@@ -117,10 +122,15 @@ class ConverterViewModel @Inject constructor(
     private fun applyForm(form: ConverterForm) {
         val repo = repository ?: return
         val metadata = _state.value.source?.metadata ?: return
-        val settings = ConversionPresetFactory(repo).create(form.preset, metadata, form.container, form.videoCodec, form.audioCodec)
+        val base = ConversionPresetFactory(repo).create(form.preset, metadata, form.container, form.videoCodec, form.audioCodec)
+        val crf = (base?.video as? VideoPlan.Encode)?.settings?.codec?.let(repo::supportsCrf) ?: false
+        val choices = base?.let { AdvancedChoices.of(it, metadata, crf) } ?: AdvancedChoices()
+        // Overrides that the new codec/container no longer offers are dropped rather than producing an invalid request.
+        val advanced = form.advanced.sanitized(choices)
+        val settings = base?.let { AdvancedOptionsApplier.apply(it, advanced, metadata.videoStreams.firstOrNull()) }
         _state.update {
             it.copy(
-                form = form, settings = settings,
+                form = form.copy(advanced = advanced), settings = settings, choices = choices,
                 videoCodecs = repo.getVideoCodecs(form.container), audioCodecs = repo.getAudioCodecs(form.container),
                 issues = emptyList(),
             )
@@ -128,7 +138,8 @@ class ConverterViewModel @Inject constructor(
     }
 
     fun onPresetSelected(preset: ConversionPreset) {
-        _state.value.form?.let { applyForm(it.copy(preset = preset)) }
+        // A preset is a fresh start: earlier overrides would silently fight it.
+        _state.value.form?.let { applyForm(it.copy(preset = preset, advanced = AdvancedOptions())) }
     }
 
     fun onContainerSelected(container: ContainerFormat) {
@@ -153,6 +164,10 @@ class ConverterViewModel @Inject constructor(
         val form = _state.value.form ?: return
         if (codec != null && codec !in _state.value.audioCodecs) return
         applyForm(form.copy(audioCodec = codec))
+    }
+
+    fun onAdvancedChanged(options: AdvancedOptions) {
+        _state.value.form?.let { applyForm(it.copy(advanced = options)) }
     }
 
     fun onOutputNameChanged(name: String) {
@@ -193,10 +208,10 @@ class ConverterViewModel @Inject constructor(
         val temp = staging.newFile("$jobId.${settings.container.extension}")
         val request = ConversionRequest(jobId, resolved, source.metadata, temp, settings)
         _state.update { it.copy(stage = ConverterStage.Converting, message = null) }
-        track(jobs.launch(ExportJob(jobId, source.displayName, ExportTask.Convert(request), destination)), jobId)
+        track(jobs.launch(ExportJob(jobId, source.displayName, ExportTask.Convert(request), destination)), jobId, SavedOutput(destination, settings.container.mimeType))
     }
 
-    private fun track(status: StateFlow<JobStatus>, jobId: String) {
+    private fun track(status: StateFlow<JobStatus>, jobId: String, saved: SavedOutput) {
         activeJobId = jobId
         statusJob = viewModelScope.launch {
             val terminal = status
@@ -209,7 +224,7 @@ class ConverterViewModel @Inject constructor(
             jobs.finish(jobId)
             activeJobId = null
             when (terminal) {
-                JobStatus.Completed -> { releaseInput(); _state.update { it.copy(stage = ConverterStage.Completed, processing = ProcessingState.Idle) } }
+                JobStatus.Completed -> { releaseInput(); _state.update { it.copy(stage = ConverterStage.Completed, processing = ProcessingState.Idle, saved = saved) } }
                 is JobStatus.Failed ->
                     backToForm(if (terminal.reason == JobFailure.SaveFailed) ConverterMessage.SaveFailed else ConverterMessage.ConversionFailed)
                 else -> backToForm(null) // cancelled

@@ -15,7 +15,10 @@ import io.bsoft.bconverter.domain.render.RenderPlanResult
 import io.bsoft.bconverter.domain.render.RenderPlanner
 import io.bsoft.bconverter.domain.timeline.VideoProject
 import io.bsoft.bconverter.media.api.AudioExtractionRequest
+import io.bsoft.bconverter.domain.render.OverlayFilters
 import io.bsoft.bconverter.media.api.RenderOutput
+import io.bsoft.bconverter.domain.render.SubtitleFilter
+import io.bsoft.bconverter.domain.subtitle.LanguageCodes
 import io.bsoft.bconverter.media.api.ConversionRequest
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -101,6 +104,28 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
         )
     }
 
+    override fun buildSubtitleExtractionCommand(request: io.bsoft.bconverter.media.api.SubtitleExtractionRequest): FfmpegCommand {
+        val s = request.settings
+        val stream = request.metadata.subtitleStreams[s.streamOrdinal]
+        // ASS is always run through the ASS encoder (it keeps the header and styles): a plain packet copy into the
+        // `ass` muxer was observed to never finish on device.
+        val copy = s.output != io.bsoft.bconverter.domain.model.SubtitleOutput.ASS &&
+            io.bsoft.bconverter.domain.usecase.SubtitleExtractionPlanner().isCopy(stream, s.output)
+        val o = mutableListOf<Pair<String, String?>>()
+        o += "-map" to "0:s:${s.streamOrdinal}"
+        o += "-vn" to null
+        o += "-an" to null
+        o += "-dn" to null
+        o += "-map_metadata" to "0" // stream language/title follow the mapped stream automatically
+        o += "-c:s" to if (copy) "copy" else requireNotNull(s.output.encoder) { "${s.output} can only be copied" }
+        o += "-f" to s.output.muxer
+        return FfmpegCommand(
+            globalOptions = listOf("-y", "-hide_banner"),
+            inputs = listOf(FfmpegInput(request.input.file.absolutePath)),
+            output = FfmpegOutput(request.outputFile.absolutePath, FfmpegOptions(o)),
+        )
+    }
+
     private fun audioFormatName(f: AudioFormat) = when (f) {
         AudioFormat.MP3 -> "mp3"
         AudioFormat.AAC -> "adts"
@@ -111,7 +136,7 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
     }
 
     override fun buildRenderCommand(project: VideoProject, output: RenderOutput): FfmpegCommand {
-        val plan = when (val result = RenderPlanner.plan(project)) {
+        val plan = when (val result = RenderPlanner.plan(project, output.keepSoundTrack)) {
             is RenderPlanResult.Success -> result.plan
             is RenderPlanResult.Failure -> throw IllegalArgumentException("The project cannot be rendered: ${result.error}")
         }
@@ -120,8 +145,17 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
         val o = mutableListOf<Pair<String, String?>>()
 
         o += "-f" to formatName(export.container)
-        o += "-filter_complex" to graph.render()
-        o += "-map" to "[${graph.videoOutput}]"
+        // Burned-in subtitles are drawn after everything else, so they are never scaled, faded or cross-faded with the clips.
+        var videoLabel = graph.videoOutput
+        // Text overlays are extra looped-picture inputs, numbered after the clips and the soft subtitle files.
+        val overlayChain = OverlayFilters.build(output.overlays, plan.canvas.width, plan.canvas.height, plan.inputs.size + output.subtitles.soft.size, videoLabel)
+        videoLabel = overlayChain.output
+        val burnChains = output.subtitles.burned.mapIndexed { i, burned ->
+            val next = "vsub${i + 1}"
+            "[$videoLabel]${SubtitleFilter.render(burned.file, output.subtitles.fontsDir)}[$next]".also { videoLabel = next }
+        }
+        o += "-filter_complex" to (listOf(graph.render()) + overlayChain.parts + burnChains).joinToString(";")
+        o += "-map" to "[$videoLabel]"
         graph.audioOutput?.let { o += "-map" to "[$it]" }
         // Canvas size and frame rate are applied inside the filter graph, not as output options.
         videoOptions(o, export.video, export.container, applyScaleAndRate = false)
@@ -134,6 +168,14 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
         } else {
             o += "-an" to null
         }
+        // Soft subtitles: one extra input per track, mapped in order, each with its codec, language, title and flags.
+        output.subtitles.soft.forEachIndexed { i, s ->
+            o += "-map" to "${plan.inputs.size + i}:0"
+            o += "-c:s:$i" to s.codec.ffmpegName
+            LanguageCodes.iso639_2(s.language)?.let { o += "-metadata:s:s:$i" to "language=$it" }
+            s.title?.takeIf { it.isNotBlank() }?.let { o += "-metadata:s:s:$i" to "title=$it" }
+            o += "-disposition:s:$i" to listOfNotNull("default".takeIf { s.isDefault }, "forced".takeIf { s.isForced }).joinToString("+").ifEmpty { "0" }
+        }
         if (export.container in FASTSTART_CONTAINERS) o += "-movflags" to "+faststart"
         o += "-t" to RenderNumbers.seconds(plan.durationMs) // audio running past the video is cut
 
@@ -144,6 +186,10 @@ class DefaultFfmpegCommandBuilder(private val encoders: EncoderNames = EncoderNa
                 if (input.seekMs > 0) options += "-ss" to RenderNumbers.seconds(input.seekMs)
                 options += "-t" to RenderNumbers.seconds(input.durationMs)
                 FfmpegInput(input.file.absolutePath, FfmpegOptions(options))
+            } + output.subtitles.soft.map { FfmpegInput(it.file.absolutePath) } + output.overlays.map {
+                FfmpegInput(it.file.absolutePath, FfmpegOptions(listOf(
+                    "-loop" to "1", "-framerate" to RenderNumbers.format(plan.canvas.frameRate), "-t" to RenderNumbers.seconds(plan.durationMs),
+                )))
             },
             output = FfmpegOutput(output.file.absolutePath, FfmpegOptions(o)),
         )

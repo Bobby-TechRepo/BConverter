@@ -25,4 +25,11 @@ data class VideoProject(
     val timeline: Timeline,
     val export: ExportSettings,
     val sourceMetadata: Map<MediaSource, MediaMetadata> = emptyMap(),
+    val subtitleTracks: List<io.bsoft.bconverter.domain.subtitle.SubtitleTrack> = emptyList(),
+    /** Text on the picture, back to front. */
+    val textOverlays: List<io.bsoft.bconverter.domain.overlay.TextOverlay> = emptyList(),
+    /** The output shape and what fills the bars. */
+    val canvas: io.bsoft.bconverter.domain.canvas.CanvasSettings = io.bsoft.bconverter.domain.canvas.CanvasSettings(),
+    /** The quality and size chosen in the export dialog. */
+    val exportChoices: io.bsoft.bconverter.domain.model.ExportChoices = io.bsoft.bconverter.domain.model.ExportChoices(),
 )

@@ -70,4 +70,11 @@ class ExportSettingsFactoryTest {
     @Test fun without_an_audio_encoder_the_export_is_silent() = assertNull(ExportSettingsFactory(TestMedia.repo(H264)).create(ExportPreset.BALANCED, MP4, hd)!!.audio)
 
     @Test fun without_a_video_encoder_there_is_no_export() = assertNull(ExportSettingsFactory(TestMedia.repo(AAC)).create(ExportPreset.BALANCED, MP4, hd))
+
+    @Test fun an_explicit_size_overrides_the_quality_default() {
+        val big = Resolution(3840, 2160)
+        assertEquals(Resolution(1920, 1080), all.create(ExportPreset.BALANCED, MP4, big, io.bsoft.bconverter.domain.model.ExportSize.P1080)!!.video.resolution)
+        assertNull(all.create(ExportPreset.SMALL_FILE, MP4, big, io.bsoft.bconverter.domain.model.ExportSize.ORIGINAL)!!.video.resolution)
+        assertEquals(Resolution(854, 480), all.create(ExportPreset.HIGH_QUALITY, MP4, hd, io.bsoft.bconverter.domain.model.ExportSize.P480)!!.video.resolution)
+    }
 }

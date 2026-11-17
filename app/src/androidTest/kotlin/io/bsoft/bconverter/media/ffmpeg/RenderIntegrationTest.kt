@@ -26,6 +26,7 @@ import org.junit.Test
 
 /** Renders real projects with FFmpeg (native mpeg4 + aac encoders) and checks the result with ffprobe. */
 class RenderIntegrationTest {
+    @get:org.junit.Rule val heavyMedia = io.bsoft.bconverter.HeavyMediaRule()
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val sample: File by lazy { IntegrationFixtures.sampleMp4(context) }
     private val dir = File(context.cacheDir, "render").apply { mkdirs() }

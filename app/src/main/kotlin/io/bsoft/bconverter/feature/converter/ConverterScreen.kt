@@ -1,5 +1,12 @@
 package io.bsoft.bconverter.feature.converter
 
+import androidx.compose.material3.CardDefaults
+import io.bsoft.bconverter.core.ui.CompletedPanel
+import io.bsoft.bconverter.core.ui.ProgressPanel
+import io.bsoft.bconverter.core.ui.SelectInputPanel
+import io.bsoft.bconverter.core.ui.PrimaryButton
+import io.bsoft.bconverter.core.ui.ErrorBanner
+import io.bsoft.bconverter.core.ui.SectionLabel
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -49,12 +56,17 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.bsoft.bconverter.R
 import io.bsoft.bconverter.core.ui.BackButton
+import io.bsoft.bconverter.core.ui.rememberShareAction
+import io.bsoft.bconverter.domain.model.SavedOutput
+import androidx.compose.foundation.layout.Row
+import io.bsoft.bconverter.core.ui.readableWidth
 import io.bsoft.bconverter.domain.model.AudioCodec
 import io.bsoft.bconverter.domain.model.ContainerFormat
 import io.bsoft.bconverter.domain.model.ConversionIssue
 import io.bsoft.bconverter.domain.model.ConversionPreset
 import io.bsoft.bconverter.domain.model.ProcessingState
 import io.bsoft.bconverter.domain.model.VideoCodec
+import io.bsoft.bconverter.domain.usecase.AdvancedOptions
 import io.bsoft.bconverter.feature.export.RequestNotificationPermissionWhen
 import io.bsoft.bconverter.feature.pickinput.PickKind
 import io.bsoft.bconverter.feature.preview.PreviewPlayer
@@ -67,17 +79,31 @@ data class ConverterActions(
     val onContainer: (ContainerFormat) -> Unit = {},
     val onVideoCodec: (VideoCodec?) -> Unit = {},
     val onAudioCodec: (AudioCodec?) -> Unit = {},
+    val onAdvanced: (AdvancedOptions) -> Unit = {},
     val onOutputName: (String) -> Unit = {},
     val onStart: () -> Unit = {},
     val onCancel: () -> Unit = {},
     val onConvertAnother: () -> Unit = {},
+    val onShare: (SavedOutput) -> Unit = {},
     val onBack: () -> Unit = {},
+    /** Step 25: convert several videos at once (opens the batch screen). */
+    val onBatch: (() -> Unit)? = null,
 )
 
-/** Stateful entry point: system pickers (input: document picker, output: create-document) + ViewModel. */
+/**
+ * Stateful entry point: system pickers (input: document picker, output: create-document) + ViewModel. [sharedInput] is a
+ * video another app shared with BConverter (step 25); it is opened once.
+ */
 @Composable
-fun ConverterScreen(onBack: () -> Unit, viewModel: ConverterViewModel = hiltViewModel()) {
+fun ConverterScreen(
+    onBack: () -> Unit,
+    onBatch: (() -> Unit)? = null,
+    sharedInput: android.net.Uri? = null,
+    viewModel: ConverterViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsState()
+    LaunchedEffect(sharedInput) { sharedInput?.let(viewModel::onInputPicked) }
+    val share = rememberShareAction()
     val pickInput = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { viewModel.onInputPicked(it) }
     val mimeType = state.form?.container?.mimeType ?: "video/*"
     val pickDestination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) {
@@ -100,11 +126,14 @@ fun ConverterScreen(onBack: () -> Unit, viewModel: ConverterViewModel = hiltView
             onContainer = viewModel::onContainerSelected,
             onVideoCodec = viewModel::onVideoCodecSelected,
             onAudioCodec = viewModel::onAudioCodecSelected,
+            onAdvanced = viewModel::onAdvancedChanged,
             onOutputName = viewModel::onOutputNameChanged,
             onStart = viewModel::onStartRequested,
             onCancel = viewModel::onCancel,
             onConvertAnother = viewModel::onConvertAnother,
+            onShare = share,
             onBack = onBack,
+            onBatch = onBatch,
         ),
     )
 }
@@ -118,35 +147,43 @@ fun ConverterContent(state: ConverterUiState, actions: ConverterActions, modifie
             TopAppBar(title = { Text(stringResource(R.string.home_convert_video)) }, navigationIcon = { BackButton(actions.onBack) })
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        // The form uses the whole tablet width in two panes; the other stages are narrow and stay centred.
+        val stageModifier = if (state.stage == ConverterStage.Configure) Modifier else Modifier.readableWidth()
+        Column(Modifier.fillMaxSize().padding(padding).then(stageModifier)) {
             when (state.stage) {
-                ConverterStage.SelectInput -> Centered {
-                    state.message?.let { MessageText(it) }
-                    Button(onClick = actions.onSelectInput) { Text(stringResource(R.string.select_video)) }
-                }
+                ConverterStage.SelectInput -> SelectInputPanel(
+                    icon = R.drawable.ic_convert_video,
+                    hint = stringResource(R.string.select_video_hint_convert),
+                    buttonText = stringResource(R.string.select_video),
+                    error = state.message?.let { messageText(it) },
+                    onSelect = actions.onSelectInput,
+                    secondaryText = actions.onBatch?.let { stringResource(R.string.batch_title) },
+                    onSecondary = { actions.onBatch?.invoke() },
+                )
                 ConverterStage.Probing -> Centered {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(16.dp))
                     Text(stringResource(R.string.converter_analyzing), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 }
                 ConverterStage.Configure -> ConfigureForm(state, actions)
-                ConverterStage.Converting -> Centered {
+                ConverterStage.Converting -> {
                     val fraction = (state.processing as? ProcessingState.Running)?.progress ?: 0f
-                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        stringResource(R.string.converter_converting, (fraction * 100).roundToInt()),
-                        Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    ProgressPanel(
+                        icon = R.drawable.ic_convert_video,
+                        fraction = fraction,
+                        label = stringResource(R.string.converter_converting, (fraction * 100).roundToInt()),
+                        cancelText = stringResource(R.string.converter_cancel),
+                        onCancel = actions.onCancel,
                     )
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedButton(onClick = actions.onCancel) { Text(stringResource(R.string.converter_cancel)) }
                 }
                 ConverterStage.Extracting -> Unit // only used by the audio extractor
-                ConverterStage.Completed -> Centered {
-                    Text(stringResource(R.string.converter_saved), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = actions.onConvertAnother) { Text(stringResource(R.string.converter_convert_another)) }
-                }
+                ConverterStage.Completed -> CompletedPanel(
+                    message = stringResource(R.string.converter_saved),
+                    saved = state.saved,
+                    onShare = actions.onShare,
+                    anotherText = stringResource(R.string.converter_convert_another),
+                    onAnother = actions.onConvertAnother,
+                )
             }
         }
     }
@@ -161,70 +198,88 @@ internal fun Centered(content: @Composable () -> Unit) {
     ) { content() }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ConfigureForm(state: ConverterUiState, actions: ConverterActions) {
     val form = state.form ?: return
     val source = state.source ?: return
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        source.previewFile?.let { PreviewPlayer(it) }
-        SourceCard(source)
-        state.message?.let { MessageText(it) }
-
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ConversionPreset.entries.forEach { preset ->
-                FilterChip(
-                    selected = form.preset == preset,
-                    onClick = { actions.onPreset(preset) },
-                    label = { Text(stringResource(preset.labelRes())) },
-                )
+    val wide = io.bsoft.bconverter.core.ui.LocalWindowLayout.current.twoPane
+    if (wide) {
+        // Wide window (tablet landscape, unfolded foldable): what is being converted on the left, how on the right; each side scrolls on its own.
+        Row(Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SourcePane(state, source)
+            }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OptionsPane(state, form, source, actions)
             }
         }
-
-        Dropdown(
-            label = stringResource(R.string.converter_container),
-            selectedText = form.container.displayName,
-            options = state.containers.map { it.displayName to it },
-            onSelect = actions.onContainer,
-        )
-        val automatic = stringResource(R.string.converter_automatic)
-        Dropdown(
-            label = stringResource(R.string.converter_video_codec),
-            selectedText = form.videoCodec?.displayName ?: automatic,
-            options = listOf<Pair<String, VideoCodec?>>(automatic to null) + state.videoCodecs.map { it.displayName to it },
-            onSelect = actions.onVideoCodec,
-        )
-        if (source.metadata.hasAudio) {
-            Dropdown(
-                label = stringResource(R.string.converter_audio_codec),
-                selectedText = form.audioCodec?.displayName ?: automatic,
-                options = listOf<Pair<String, AudioCodec?>>(automatic to null) + state.audioCodecs.map { it.displayName to it },
-                onSelect = actions.onAudioCodec,
-            )
-        }
-        OutlinedTextField(
-            value = form.outputName,
-            onValueChange = actions.onOutputName,
-            label = { Text(stringResource(R.string.converter_output_name)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        state.issues.forEach { issue ->
-            Text(
-                issue.messageText(),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
-            )
-        }
-        if (state.settings == null) Text(stringResource(R.string.converter_no_settings), color = MaterialTheme.colorScheme.error)
-        Button(onClick = actions.onStart, enabled = state.settings != null, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.converter_convert))
+    } else {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            SourcePane(state, source)
+            OptionsPane(state, form, source, actions)
         }
     }
+}
+
+@Composable
+private fun SourcePane(state: ConverterUiState, source: SourceInfo) {
+    source.previewFile?.let { PreviewPlayer(it) }
+    SourceCard(source)
+    state.message?.let { MessageText(it) }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OptionsPane(state: ConverterUiState, form: ConverterForm, source: SourceInfo, actions: ConverterActions) {
+    SectionLabel(stringResource(R.string.section_preset))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ConversionPreset.entries.forEach { preset ->
+            FilterChip(
+                selected = form.preset == preset,
+                onClick = { actions.onPreset(preset) },
+                label = { Text(stringResource(preset.labelRes())) },
+            )
+        }
+    }
+
+    SectionLabel(stringResource(R.string.section_format))
+    Dropdown(
+        label = stringResource(R.string.converter_container),
+        selectedText = form.container.displayName,
+        options = state.containers.map { it.displayName to it },
+        onSelect = actions.onContainer,
+    )
+    val automatic = stringResource(R.string.converter_automatic)
+    Dropdown(
+        label = stringResource(R.string.converter_video_codec),
+        selectedText = form.videoCodec?.displayName ?: automatic,
+        options = listOf<Pair<String, VideoCodec?>>(automatic to null) + state.videoCodecs.map { it.displayName to it },
+        onSelect = actions.onVideoCodec,
+    )
+    if (source.metadata.hasAudio) {
+        Dropdown(
+            label = stringResource(R.string.converter_audio_codec),
+            selectedText = form.audioCodec?.displayName ?: automatic,
+            options = listOf<Pair<String, AudioCodec?>>(automatic to null) + state.audioCodecs.map { it.displayName to it },
+            onSelect = actions.onAudioCodec,
+        )
+    }
+    AdvancedSettingsSection(state.choices, form.advanced, actions.onAdvanced)
+    SectionLabel(stringResource(R.string.section_output))
+    OutlinedTextField(
+        value = form.outputName,
+        onValueChange = actions.onOutputName,
+        label = { Text(stringResource(R.string.converter_output_name)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    state.issues.forEach { issue -> ErrorBanner(issue.messageText()) }
+    if (state.settings == null) ErrorBanner(stringResource(R.string.converter_no_settings))
+    PrimaryButton(stringResource(R.string.converter_convert), actions.onStart, enabled = state.settings != null)
 }
 
 @Composable
@@ -232,10 +287,10 @@ internal fun SourceCard(source: SourceInfo) {
     val context = LocalContext.current
     val unknown = stringResource(R.string.converter_unknown)
     val m = source.metadata
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(source.displayName, style = MaterialTheme.typography.titleMedium)
-            Text(Formatter.formatFileSize(context, source.sizeBytes), style = MaterialTheme.typography.bodySmall)
+            Text(Formatter.formatFileSize(context, source.sizeBytes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.converter_summary_duration, formatDuration(m.durationMs)))
             m.container?.let { Text(stringResource(R.string.converter_summary_container, it.displayName)) }
             m.videoStreams.firstOrNull()?.let {
@@ -269,23 +324,24 @@ internal fun <T> Dropdown(label: String, selectedText: String, options: List<Pai
 
 @Composable
 internal fun MessageText(message: ConverterMessage) {
-    Text(
-        text = when (message) {
+    ErrorBanner(messageText(message), Modifier.padding(bottom = 16.dp))
+}
+
+@Composable
+internal fun messageText(message: ConverterMessage): String =
+        when (message) {
             is ConverterMessage.InputProblem -> inputErrorMessage(message.error)
             ConverterMessage.ProbeFailed -> stringResource(R.string.msg_probe_failed)
             ConverterMessage.NoVideoStream -> stringResource(R.string.msg_no_video)
             ConverterMessage.NoAudioStream -> stringResource(R.string.msg_no_audio)
+            ConverterMessage.NoSubtitleStream -> stringResource(R.string.issue_no_subtitles)
             ConverterMessage.NoEncodersAvailable -> stringResource(R.string.msg_no_encoders)
             ConverterMessage.ConversionFailed -> stringResource(R.string.msg_conversion_failed)
             ConverterMessage.SaveFailed -> stringResource(R.string.msg_save_failed)
-        },
-        color = MaterialTheme.colorScheme.error,
-        modifier = Modifier.padding(bottom = 16.dp).semantics { liveRegion = LiveRegionMode.Assertive },
-    )
-}
+        }
 
 @StringRes
-private fun ConversionPreset.labelRes(): Int = when (this) {
+internal fun ConversionPreset.labelRes(): Int = when (this) {
     ConversionPreset.SMALL_FILE -> R.string.preset_small_file
     ConversionPreset.BALANCED -> R.string.preset_balanced
     ConversionPreset.HIGH_QUALITY -> R.string.preset_high_quality
@@ -311,6 +367,9 @@ internal fun ConversionIssue.messageRes(): Int = when (this) {
     is ConversionIssue.InvalidChannels -> R.string.issue_channels
     ConversionIssue.InvalidOutputName -> R.string.issue_output_name
     ConversionIssue.InvalidAudioStream -> R.string.issue_audio_stream
+    ConversionIssue.SourceHasNoSubtitles -> R.string.issue_no_subtitles
+    ConversionIssue.InvalidSubtitleStream -> R.string.issue_subtitle_stream
+    ConversionIssue.SubtitleOutputNotAvailable -> R.string.issue_subtitle_output
     is ConversionIssue.InsufficientStorage -> R.string.issue_insufficient_storage
 }
 

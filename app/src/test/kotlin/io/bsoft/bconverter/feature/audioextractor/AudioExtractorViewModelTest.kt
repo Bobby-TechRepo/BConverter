@@ -1,6 +1,7 @@
 package io.bsoft.bconverter.feature.audioextractor
 
 import android.net.Uri
+import io.bsoft.bconverter.domain.model.SavedOutput
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -299,5 +300,13 @@ class AudioExtractorViewModelTest {
     // ---- preview ----
     @Test fun the_staged_file_is_offered_for_preview() = runTest(dispatcher) {
         assertEquals(staged.file, opened().state.value.source!!.previewFile)
+    }
+
+    // ---- sharing (spec Phase 16) ----
+    @Test fun a_finished_extraction_remembers_where_it_was_saved_so_it_can_be_shared() = runTest(dispatcher) {
+        engine.onExtract = { it.outputFile.writeText("audio") }
+        val vm = opened(); val format = vm.state.value.settings!!.format
+        extracting(vm)
+        assertEquals(SavedOutput(destination, format.mimeType), vm.state.value.saved)
     }
 }

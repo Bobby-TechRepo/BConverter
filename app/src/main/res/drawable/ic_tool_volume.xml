@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder in the Glyphs outline style (80x80 grid, 5 stroke). tools/icons/fetch_glyphs.py replaces it with the real Glyphs icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:pathData="M10,32H24L44,16V64L24,48H10ZM56,30a14,14 0 0,1 0,20M64,22a26,26 0 0,1 0,36" android:strokeColor="#FF000000" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.bsoft.bconverter.R
 import io.bsoft.bconverter.core.ui.BackButton
+import io.bsoft.bconverter.core.ui.readableWidth
 
 /** Stateful entry point: SAF document picker (MediaStore-backed gallery included) + ViewModel. */
 @Composable
@@ -73,7 +74,7 @@ fun PickInputContent(
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).readableWidth().padding(24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

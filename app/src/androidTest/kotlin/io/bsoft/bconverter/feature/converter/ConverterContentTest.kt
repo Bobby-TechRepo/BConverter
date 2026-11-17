@@ -1,6 +1,13 @@
 package io.bsoft.bconverter.feature.converter
 
+import androidx.compose.ui.test.assertDoesNotExist
+import io.bsoft.bconverter.domain.model.SavedOutput
+import android.net.Uri
+import android.content.res.Configuration
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -119,5 +126,41 @@ class ConverterContentTest {
         rule.onNodeWithText(s(R.string.converter_saved)).assertIsDisplayed()
         rule.onNodeWithText(s(R.string.converter_convert_another)).performClick()
         assertTrue(again)
+    }
+
+    // ---- layouts (spec §37): the tablet form is two panes, not the phone column stretched ----
+    private fun showWithSmallestWidth(widthDp: Int, state: ConverterUiState) = rule.setContent {
+        val base = LocalConfiguration.current
+        val config = Configuration(base).apply { smallestScreenWidthDp = widthDp }
+        CompositionLocalProvider(LocalConfiguration provides config) { ConverterContent(state, ConverterActions()) }
+    }
+
+    @Test fun on_a_tablet_the_source_sits_beside_the_options() {
+        showWithSmallestWidth(720, configure())
+        val source = rule.onNodeWithText("holiday.mp4").getBoundsInRoot()
+        val convert = rule.onNodeWithText(s(R.string.converter_convert)).getBoundsInRoot()
+        assertTrue("source ${source.right} should end before the options start at ${convert.left}", source.right <= convert.left)
+    }
+
+    @Test fun on_a_phone_the_source_is_above_the_options() {
+        showWithSmallestWidth(360, configure())
+        val source = rule.onNodeWithText("holiday.mp4").getBoundsInRoot()
+        val container = rule.onNodeWithText(s(R.string.converter_container)).getBoundsInRoot()
+        assertTrue(source.bottom <= container.top)
+    }
+
+    // ---- sharing (spec Phase 16) ----
+    private val saved = SavedOutput(Uri.parse("content://flow/out"), "video/mp4")
+
+    @Test fun a_finished_conversion_can_be_shared() {
+        var shared: SavedOutput? = null
+        show(configure().copy(stage = ConverterStage.Completed, saved = saved), ConverterActions(onShare = { shared = it }))
+        rule.onNodeWithText(s(R.string.share)).performClick()
+        assertEquals(saved, shared)
+    }
+
+    @Test fun without_a_saved_file_there_is_nothing_to_share() {
+        show(configure().copy(stage = ConverterStage.Completed))
+        rule.onNodeWithText(s(R.string.share)).assertDoesNotExist()
     }
 }

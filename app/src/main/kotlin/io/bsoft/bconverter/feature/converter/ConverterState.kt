@@ -8,7 +8,10 @@ import io.bsoft.bconverter.domain.model.ConversionSettings
 import io.bsoft.bconverter.domain.model.InputError
 import io.bsoft.bconverter.domain.model.MediaMetadata
 import io.bsoft.bconverter.domain.model.ProcessingState
+import io.bsoft.bconverter.domain.model.SavedOutput
 import io.bsoft.bconverter.domain.model.VideoCodec
+import io.bsoft.bconverter.domain.usecase.AdvancedChoices
+import io.bsoft.bconverter.domain.usecase.AdvancedOptions
 import java.io.File
 
 /** Shared by the converter and the audio extractor ([Converting] vs [Extracting] are their respective busy states). */
@@ -19,6 +22,7 @@ sealed interface ConverterMessage {
     data object ProbeFailed : ConverterMessage
     data object NoVideoStream : ConverterMessage
     data object NoAudioStream : ConverterMessage
+    data object NoSubtitleStream : ConverterMessage
     data object NoEncodersAvailable : ConverterMessage
     data object ConversionFailed : ConverterMessage
     data object SaveFailed : ConverterMessage
@@ -34,6 +38,8 @@ data class ConverterForm(
     val videoCodec: VideoCodec?,
     val audioCodec: AudioCodec?,
     val outputName: String,
+    /** Overrides on top of the preset (spec §18); sanitised against what the current codec offers. */
+    val advanced: AdvancedOptions = AdvancedOptions(),
 )
 
 data class ConverterUiState(
@@ -45,9 +51,13 @@ data class ConverterUiState(
     val containers: List<ContainerFormat> = emptyList(),
     val videoCodecs: List<VideoCodec> = emptyList(),
     val audioCodecs: List<AudioCodec> = emptyList(),
+    /** What the advanced section may offer for the current settings. */
+    val choices: AdvancedChoices = AdvancedChoices(),
     val issues: List<ConversionIssue> = emptyList(),
     val message: ConverterMessage? = null,
     val processing: ProcessingState = ProcessingState.Idle,
+    /** Where the finished video was saved; set when the conversion completes. */
+    val saved: SavedOutput? = null,
 )
 
 sealed interface ConverterEvent {

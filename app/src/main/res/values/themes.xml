@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.BConverter" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- AppCompat is required for the in-app language switch (AppCompatActivity); the screens themselves are Compose.
+         The window background matches the Compose background so there is no white flash before the first frame. -->
+    <style name="Theme.BConverter" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/bc_background</item>
+    </style>
 </resources>

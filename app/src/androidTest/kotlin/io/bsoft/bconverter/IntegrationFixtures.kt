@@ -1,31 +1,28 @@
 package io.bsoft.bconverter
 
 import android.content.Context
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.FFmpegKitConfig
-import com.arthenica.ffmpegkit.ReturnCode
+import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 
 /**
- * Instrumented tests share one tiny generated MP4 (mpeg4 + aac, 2 s, 160x120) instead of re-encoding it per test.
- * Encoding on a slow emulator is the heaviest thing these suites do, so it happens once per process.
- * Treat the file as read-only.
+ * Instrumented tests share one tiny MP4 (mpeg4 + aac, 2 s, 160x120, ~45 KB) shipped as a test asset.
+ * It used to be generated with FFmpeg's lavfi sources, which blocks right after the banner on some devices,
+ * so the fixture no longer depends on the engine under test. Treat the file as read-only.
  */
 object IntegrationFixtures {
+    private const val ASSET = "sample-160x120.mp4"
+
     @Synchronized
     fun sampleMp4(context: Context): File {
         val dir = File(context.cacheDir, "fixtures").apply { mkdirs() }
-        val file = File(dir, "sample-160x120.mp4")
+        val file = File(dir, ASSET)
         if (file.length() > 0) return file
-        val session = FFmpegKit.executeWithArguments(
-            arrayOf(
-                "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=10",
-                "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
-                "-c:v", "mpeg4", "-c:a", "aac", "-shortest", file.absolutePath,
-            ),
-        )
-        check(ReturnCode.isSuccess(session.returnCode)) { "fixture generation failed: ${session.output}" }
-        FFmpegKitConfig.clearSessions() // do not keep the session history in memory
+        // The asset lives in the test APK, so it is read through the instrumentation's own context.
+        val tmp = File(dir, "$ASSET.part")
+        InstrumentationRegistry.getInstrumentation().context.assets.open(ASSET).use { input ->
+            tmp.outputStream().use { input.copyTo(it) }
+        }
+        check(tmp.renameTo(file)) { "could not install the sample video fixture" }
         return file
     }
 }

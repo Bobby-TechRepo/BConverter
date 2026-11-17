@@ -29,6 +29,7 @@ import org.junit.Test
  * lavfi test sources and the native mpeg4/aac encoders, so no binary assets are checked in.
  */
 class FfmpegKitIntegrationTest {
+    @get:org.junit.Rule val heavyMedia = io.bsoft.bconverter.HeavyMediaRule()
     private val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "it").apply { mkdirs() }
     private val sample: File by lazy { IntegrationFixtures.sampleMp4(InstrumentationRegistry.getInstrumentation().targetContext) }
     private val probe = FfmpegKitFfprobeRunner(Dispatchers.IO)

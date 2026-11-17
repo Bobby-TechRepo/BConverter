@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Storage: stacked disks, Glyphs-style outline (80x80 grid, 5 stroke). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:pathData="M14,20C14,14 26,10 40,10C54,10 66,14 66,20C66,26 54,30 40,30C26,30 14,26 14,20ZM14,20V60C14,66 26,70 40,70C54,70 66,66 66,60V20M14,40C14,46 26,50 40,50C54,50 66,46 66,40"
+        android:strokeColor="#FF000000" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+</vector>

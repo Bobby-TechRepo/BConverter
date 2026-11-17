@@ -2,7 +2,8 @@ package io.bsoft.bconverter.media.ffmpeg
 
 sealed interface FfmpegExecResult {
     data object Success : FfmpegExecResult
-    data class Failure(val exitCode: Int?) : FfmpegExecResult
+    /** [logTail]: the end of FFmpeg's log for this run (why it failed), when the executor captured it. */
+    data class Failure(val exitCode: Int?, val logTail: String? = null) : FfmpegExecResult
     data object Cancelled : FfmpegExecResult
 }
 

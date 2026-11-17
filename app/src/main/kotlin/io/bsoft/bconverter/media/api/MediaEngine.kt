@@ -27,7 +27,22 @@ data class AudioExtractionRequest(
     val outputFile: File,
     val settings: AudioExtractionSettings,
 )
-data class RenderOutput(val file: File)
+/** Extracts one subtitle stream from [input] into [outputFile] in the format given by [settings]. */
+data class SubtitleExtractionRequest(
+    val jobId: String,
+    val input: ResolvedInput,
+    val metadata: MediaMetadata,
+    val outputFile: File,
+    val settings: io.bsoft.bconverter.domain.model.SubtitleExtractionSettings,
+)
+data class RenderOutput(
+    val file: File,
+    val subtitles: io.bsoft.bconverter.domain.render.RenderSubtitles = io.bsoft.bconverter.domain.render.RenderSubtitles.None,
+    /** Drawn text overlay pictures, back to front; they go over the video and under burned subtitles. */
+    val overlays: List<io.bsoft.bconverter.domain.overlay.OverlayLayer> = emptyList(),
+    /** Always write a sound track when the export has sound (silent if no clip has any); see RenderPlanner.plan. */
+    val keepSoundTrack: Boolean = false,
+)
 data class Thumbnail(val positionMs: Long, val file: File)
 
 sealed interface MediaProcessingResult {
@@ -53,6 +68,7 @@ interface MediaEngine {
     suspend fun probe(source: MediaSource): MediaMetadata
     suspend fun convert(request: ConversionRequest): MediaProcessingResult
     suspend fun extractAudio(request: AudioExtractionRequest): MediaProcessingResult
+    suspend fun extractSubtitle(request: SubtitleExtractionRequest): MediaProcessingResult
     suspend fun render(project: VideoProject, output: RenderOutput): MediaProcessingResult
     suspend fun generateThumbnail(source: MediaSource, positionMs: Long): Thumbnail
     fun observeProgress(jobId: String): Flow<MediaProcessingProgress>

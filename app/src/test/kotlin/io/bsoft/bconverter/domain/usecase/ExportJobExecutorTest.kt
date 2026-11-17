@@ -177,6 +177,47 @@ class ExportJobExecutorTest {
         assertEquals("rendered", publisher.published.single().content); assertFalse(output.exists())
     }
 
+    private val layersDir get() = tmp.root
+    private fun overlayProject() = TL.project(TL.timeline(TL.video("a", 10_000))).copy(
+        textOverlays = listOf(io.bsoft.bconverter.domain.overlay.TextOverlay("t1", "Hi", 0, 2000)),
+    )
+    private fun overlayRenderJob(project: io.bsoft.bconverter.domain.timeline.VideoProject): ExportJob {
+        if (!::second.isInitialized) second = ResolvedInput(tmp.newFile("in2.mp4"), "in2.mp4", 10, true)
+        return ExportJob("job-1", "my project", ExportTask.Render(project, output, listOf(input, second)), destination).also { registry.register(it) }
+    }
+    private class FakePreparer(var result: List<io.bsoft.bconverter.domain.overlay.OverlayLayer>?) : io.bsoft.bconverter.domain.overlay.OverlayLayerPreparer {
+        var calls = 0; var size: Pair<Int, Int>? = null
+        override suspend fun prepare(overlays: List<io.bsoft.bconverter.domain.overlay.TextOverlay>, canvasWidth: Int, canvasHeight: Int):
+            List<io.bsoft.bconverter.domain.overlay.OverlayLayer>? { calls++; size = canvasWidth to canvasHeight; return result }
+    }
+
+    @Test fun overlays_are_prepared_at_the_canvas_size_and_passed_to_the_engine() = runTest {
+        val project = overlayProject()
+        val layer = io.bsoft.bconverter.domain.overlay.OverlayLayer(project.textOverlays.single(), File(layersDir, "l.png"), 10, 10)
+        val preparer = FakePreparer(listOf(layer))
+        engine.onRender = { _, out -> out.file.writeText("rendered") }
+        overlayRenderJob(project)
+        assertEquals(JobStatus.Completed, ExportJobExecutor(engine, resolver, publisher, registry, preparer).execute("job-1"))
+        assertEquals(1, preparer.calls); assertTrue(preparer.size!!.first > 0)
+        assertEquals(listOf(layer), engine.rendered.single().second.overlays)
+    }
+    @Test fun a_project_without_overlays_does_not_touch_the_preparer() = runTest {
+        val preparer = FakePreparer(emptyList())
+        engine.onRender = { _, out -> out.file.writeText("r") }; renderJob()
+        assertEquals(JobStatus.Completed, ExportJobExecutor(engine, resolver, publisher, registry, preparer).execute("job-1"))
+        assertEquals(0, preparer.calls)
+    }
+    @Test fun overlays_that_cannot_be_drawn_fail_the_export_instead_of_dropping_the_text() = runTest {
+        overlayRenderJob(overlayProject())
+        assertEquals(JobStatus.Failed(JobFailure.OverlaysFailed), ExportJobExecutor(engine, resolver, publisher, registry, FakePreparer(null)).execute("job-1"))
+        assertTrue(engine.rendered.isEmpty()); assertTrue(publisher.published.isEmpty()); assertFalse(output.exists())
+    }
+    @Test fun overlays_without_any_preparer_also_fail() = runTest {
+        overlayRenderJob(overlayProject())
+        assertEquals(JobStatus.Failed(JobFailure.OverlaysFailed), executor.execute("job-1"))
+        assertTrue(engine.rendered.isEmpty())
+    }
+
     @Test fun a_failed_render_fails_the_job_without_publishing() = runTest {
         engine.processingResult = MediaProcessingResult.Failure("boom"); renderJob()
         assertEquals(JobStatus.Failed(JobFailure.ConversionFailed), executor.execute("job-1"))
@@ -200,5 +241,19 @@ class ExportJobExecutorTest {
     @Test fun an_attached_render_leaves_its_inputs_to_the_owner() = runTest {
         engine.onRender = { _, out -> out.file.writeText("r") }; renderJob(); executor.execute("job-1")
         assertTrue(resolver.released.isEmpty())
+    }
+
+    @Test fun a_subtitle_extraction_is_run_published_and_cleaned_up() = runTest {
+        engine.onExtractSubtitle = { it.outputFile.writeText("1\n00:00:01,000 --> 00:00:02,000\nHi\n") }
+        ExportJob(
+            "job-1", "movie",
+            ExportTask.ExtractSubtitle(io.bsoft.bconverter.media.api.SubtitleExtractionRequest(
+                "job-1", input, TestMedia.metadata(), output,
+                io.bsoft.bconverter.domain.model.SubtitleExtractionSettings(0, io.bsoft.bconverter.domain.model.SubtitleOutput.SRT),
+            )),
+            destination,
+        ).also { registry.register(it) }
+        assertEquals(JobStatus.Completed, executor.execute("job-1"))
+        assertTrue(publisher.published.single().content!!.contains("Hi")); assertEquals(1, engine.extractedSubtitles.size); assertFalse(output.exists())
     }
 }

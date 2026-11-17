@@ -148,4 +148,17 @@ class FfprobeJsonParserTest {
     @Test fun json_without_format_is_invalid_output() = assertEquals(ProbeFailure.InvalidOutput, rejected("{}"))
     @Test fun no_media_streams_is_reported() =
         assertEquals(ProbeFailure.NoMediaStreams, rejected("""{"streams":[],"format":{"format_name":"mp4"}}"""))
+
+    @Test fun subtitle_streams_keep_title_default_forced_and_kind() {
+        val json = """{"format":{"duration":"10"},"streams":[
+            {"index":0,"codec_type":"video","codec_name":"h264","width":640,"height":360},
+            {"index":2,"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English SDH"},"disposition":{"default":1,"forced":0}},
+            {"index":3,"codec_type":"subtitle","codec_name":"hdmv_pgs_subtitle","tags":{"language":"fra"},"disposition":{"default":0,"forced":1}},
+            {"index":4,"codec_type":"subtitle","codec_name":"ass","tags":{"language":"und"}}]}"""
+        val subs = parsed(json).subtitleStreams
+        assertEquals(listOf(2, 3, 4), subs.map { it.index }); assertEquals(listOf("eng", "fra", null), subs.map { it.language })
+        assertEquals(listOf("English SDH", null, null), subs.map { it.title })
+        assertEquals(listOf(true, false, false), subs.map { it.isDefault }); assertEquals(listOf(false, true, false), subs.map { it.isForced })
+        assertEquals(listOf(io.bsoft.bconverter.domain.model.SubtitleKind.TEXT, io.bsoft.bconverter.domain.model.SubtitleKind.IMAGE, io.bsoft.bconverter.domain.model.SubtitleKind.TEXT), subs.map { it.kind })
+    }
 }

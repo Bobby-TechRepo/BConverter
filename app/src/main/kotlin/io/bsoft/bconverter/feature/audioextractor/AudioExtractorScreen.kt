@@ -1,8 +1,15 @@
 package io.bsoft.bconverter.feature.audioextractor
 
+import io.bsoft.bconverter.core.ui.CompletedPanel
+import io.bsoft.bconverter.core.ui.ProgressPanel
+import io.bsoft.bconverter.core.ui.SelectInputPanel
+import io.bsoft.bconverter.core.ui.PrimaryButton
+import io.bsoft.bconverter.core.ui.ErrorBanner
+import io.bsoft.bconverter.core.ui.SectionLabel
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.bsoft.bconverter.R
 import io.bsoft.bconverter.core.ui.BackButton
+import io.bsoft.bconverter.core.ui.rememberShareAction
+import io.bsoft.bconverter.domain.model.SavedOutput
+import io.bsoft.bconverter.core.ui.readableWidth
 import io.bsoft.bconverter.domain.model.AudioFormat
 import io.bsoft.bconverter.domain.model.ProcessingState
 import io.bsoft.bconverter.feature.converter.ConverterEvent
@@ -64,13 +74,21 @@ data class ExtractorActions(
     val onStart: () -> Unit = {},
     val onCancel: () -> Unit = {},
     val onExtractAnother: () -> Unit = {},
+    val onShare: (SavedOutput) -> Unit = {},
     val onBack: () -> Unit = {},
 )
 
 /** Stateful entry point: system pickers (input: document picker, output: create-document) + ViewModel. */
 @Composable
-fun AudioExtractorScreen(onBack: () -> Unit, viewModel: AudioExtractorViewModel = hiltViewModel()) {
+fun AudioExtractorScreen(
+    onBack: () -> Unit,
+    /** A video another app shared with BConverter (step 25); it is opened once. */
+    sharedInput: android.net.Uri? = null,
+    viewModel: AudioExtractorViewModel = hiltViewModel(),
+) {
+    val share = rememberShareAction()
     val state by viewModel.state.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(sharedInput) { sharedInput?.let(viewModel::onInputPicked) }
     val pickInput = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { viewModel.onInputPicked(it) }
     val mimeType = state.form?.format?.mimeType ?: "audio/*"
     val pickDestination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) {
@@ -88,6 +106,7 @@ fun AudioExtractorScreen(onBack: () -> Unit, viewModel: AudioExtractorViewModel 
     AudioExtractorContent(
         state = state,
         actions = ExtractorActions(
+            onShare = share,
             onSelectInput = { pickInput.launch(PickKind.VIDEO.mimeTypes.toTypedArray()) },
             onStream = viewModel::onStreamSelected,
             onFormat = viewModel::onFormatSelected,
@@ -108,34 +127,38 @@ fun AudioExtractorContent(state: AudioExtractorUiState, actions: ExtractorAction
         modifier = modifier,
         topBar = { TopAppBar(title = { Text(stringResource(R.string.home_extract_audio)) }, navigationIcon = { BackButton(actions.onBack) }) },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding).readableWidth()) {
             when (state.stage) {
-                ConverterStage.SelectInput -> Centered {
-                    state.message?.let { MessageText(it) }
-                    Button(onClick = actions.onSelectInput) { Text(stringResource(R.string.select_video)) }
-                }
+                ConverterStage.SelectInput -> SelectInputPanel(
+                    icon = R.drawable.ic_extract_audio,
+                    hint = stringResource(R.string.select_video_hint_extract),
+                    buttonText = stringResource(R.string.select_video),
+                    error = state.message?.let { messageText(it) },
+                    onSelect = actions.onSelectInput,
+                )
                 ConverterStage.Probing -> Centered {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(16.dp))
                     Text(stringResource(R.string.converter_analyzing), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 }
                 ConverterStage.Configure -> ConfigureForm(state, actions)
-                ConverterStage.Extracting -> Centered {
+                ConverterStage.Extracting -> {
                     val fraction = (state.processing as? ProcessingState.Running)?.progress ?: 0f
-                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        stringResource(R.string.extractor_extracting, (fraction * 100).roundToInt()),
-                        Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    ProgressPanel(
+                        icon = R.drawable.ic_extract_audio,
+                        fraction = fraction,
+                        label = stringResource(R.string.extractor_extracting, (fraction * 100).roundToInt()),
+                        cancelText = stringResource(R.string.converter_cancel),
+                        onCancel = actions.onCancel,
                     )
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedButton(onClick = actions.onCancel) { Text(stringResource(R.string.converter_cancel)) }
                 }
-                ConverterStage.Completed -> Centered {
-                    Text(stringResource(R.string.extractor_saved), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = actions.onExtractAnother) { Text(stringResource(R.string.extractor_extract_another)) }
-                }
+                ConverterStage.Completed -> CompletedPanel(
+                    message = stringResource(R.string.extractor_saved),
+                    saved = state.saved,
+                    onShare = actions.onShare,
+                    anotherText = stringResource(R.string.extractor_extract_another),
+                    onAnother = actions.onExtractAnother,
+                )
                 ConverterStage.Converting -> Unit // only used by the video converter
             }
         }
@@ -166,6 +189,7 @@ private fun ConfigureForm(state: AudioExtractorUiState, actions: ExtractorAction
                 onSelect = actions.onStream,
             )
         }
+        SectionLabel(stringResource(R.string.section_format))
         Dropdown(
             label = stringResource(R.string.extractor_format),
             selectedText = form.format.displayName,
@@ -173,7 +197,7 @@ private fun ConfigureForm(state: AudioExtractorUiState, actions: ExtractorAction
             onSelect = actions.onFormat,
         )
         Row(
-            Modifier.fillMaxWidth().toggleable(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(
                 value = copyChecked, enabled = state.canCopy, role = Role.Switch, onValueChange = actions.onPreferCopy,
             ),
             verticalAlignment = Alignment.CenterVertically,
@@ -182,6 +206,7 @@ private fun ConfigureForm(state: AudioExtractorUiState, actions: ExtractorAction
             Switch(checked = copyChecked, onCheckedChange = null, enabled = state.canCopy)
         }
         if (!state.canCopy) Text(stringResource(R.string.extractor_reencode_hint), style = MaterialTheme.typography.bodySmall)
+        SectionLabel(stringResource(R.string.section_output))
         OutlinedTextField(
             value = form.outputName,
             onValueChange = actions.onOutputName,
@@ -189,15 +214,7 @@ private fun ConfigureForm(state: AudioExtractorUiState, actions: ExtractorAction
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        state.issues.forEach { issue ->
-            Text(
-                issue.messageText(),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
-            )
-        }
-        Button(onClick = actions.onStart, enabled = state.settings != null, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.extractor_extract))
-        }
+        state.issues.forEach { issue -> ErrorBanner(issue.messageText()) }
+        PrimaryButton(stringResource(R.string.extractor_extract), actions.onStart, enabled = state.settings != null)
     }
 }

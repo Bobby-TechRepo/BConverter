@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ system splash screen: the brand mark on the brand iris, on the app's background colour. -->
+    <style name="Theme.BConverter" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/bc_background</item>
+        <item name="android:windowSplashScreenBackground">@color/bc_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/bc_iris</item>
+    </style>
+</resources>

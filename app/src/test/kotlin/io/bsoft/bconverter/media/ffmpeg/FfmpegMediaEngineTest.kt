@@ -25,6 +25,7 @@ import io.bsoft.bconverter.media.api.MediaProcessingResult
 import io.bsoft.bconverter.media.api.RenderOutput
 import java.io.File
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -81,6 +82,12 @@ class FfmpegMediaEngineTest {
         assertTrue(r.message.contains("3"))
     }
 
+    @Test fun a_failed_run_carries_the_end_of_the_ffmpeg_log() = runTest {
+        executor.result = FfmpegExecResult.Failure(1, "Unknown encoder 'libx264'\n")
+        val r = engine.convert(request) as MediaProcessingResult.Failure
+        assertTrue(r.message.contains("Unknown encoder 'libx264'"))
+    }
+
     @Test fun cancelled_run_is_cancelled() = runTest {
         executor.result = FfmpegExecResult.Cancelled
         assertEquals(MediaProcessingResult.Cancelled, engine.convert(request))
@@ -115,7 +122,7 @@ class FfmpegMediaEngineTest {
 
     // ---- audio extraction ----
     private fun extraction(out: File = File(tmp.root, "out.m4a")) = AudioExtractionRequest(
-        "job-1", request.input, request.metadata, out, AudioExtractionSettings(AudioFormat.M4A, 0, AudioExtractionMode.Copy),
+        "job-1", request.input, request.metadata.copy(subtitleStreams = listOf(io.bsoft.bconverter.domain.model.SubtitleStream(2, "eng", "subrip"))), out, AudioExtractionSettings(AudioFormat.M4A, 0, AudioExtractionMode.Copy),
     )
 
     @Test fun extraction_runs_the_built_command_under_the_job_id() = runTest {
@@ -182,5 +189,79 @@ class FfmpegMediaEngineTest {
         runCurrent()
         engine.render(project(), out)
         assertEquals(MediaProcessingProgress(2500, 10_000, 0.25f, 2.0, 3750), first.await())
+    }
+
+    // ---- rendering in parts (step 18) ----
+    /** Writes each run's output file (the last argument), like a real FFmpeg run. */
+    private class WritingExecutor : FfmpegExecutor {
+        val calls = mutableListOf<List<String>>()
+        var failAt: Int? = null
+        override suspend fun execute(jobId: String, args: List<String>, onStatistics: (Long, Double?) -> Unit): FfmpegExecResult {
+            calls += args
+            if (failAt == calls.size) return FfmpegExecResult.Failure(1, "boom")
+            onStatistics(1_000, 1.0)
+            File(args.last()).writeText("data")
+            return FfmpegExecResult.Success
+        }
+        override suspend fun cancel(jobId: String) {}
+    }
+
+    private fun longProject() = TL.project(TL.timeline(TL.video("a", 4_000), TL.video("b", 4_000), TL.video("c", 4_000))).copy(id = "proj-1")
+
+    @Test fun a_long_project_renders_its_parts_joins_them_then_runs_the_final_pass() = runTest {
+        val writing = WritingExecutor()
+        val parted = FfmpegMediaEngine(MediaProber(resolver, runner), resolver, writing, maxClipsPerPart = 2) { DefaultFfmpegCommandBuilder() }
+        val out = renderOutput()
+        assertEquals(MediaProcessingResult.Success(out.file), parted.render(longProject(), out))
+        assertEquals(4, writing.calls.size) // two parts, the join, the final pass
+        assertTrue(writing.calls[0].last().endsWith("final.part1.mkv"))
+        assertTrue(writing.calls[1].last().endsWith("final.part2.mkv"))
+        assertTrue(writing.calls[2].containsAll(listOf("concat", "copy")))
+        assertTrue(writing.calls[3].contains(File(tmp.root, "final.joined.mkv").absolutePath))
+        assertEquals(out.file.absolutePath, writing.calls[3].last())
+        // Only the export is left.
+        assertEquals(listOf("final.mp4"), tmp.root.list()!!.filter { it.startsWith("final") })
+    }
+
+    @Test fun a_failed_part_stops_the_render_and_cleans_up() = runTest {
+        val writing = WritingExecutor().apply { failAt = 2 }
+        val parted = FfmpegMediaEngine(MediaProber(resolver, runner), resolver, writing, maxClipsPerPart = 2) { DefaultFfmpegCommandBuilder() }
+        val result = parted.render(longProject(), renderOutput()) as MediaProcessingResult.Failure
+        assertTrue(result.message.contains("part 2 of 2"))
+        assertEquals(2, writing.calls.size)
+        assertTrue(tmp.root.list()!!.none { it.startsWith("final") })
+    }
+
+    @Test fun progress_runs_over_the_parts_and_the_final_pass() = runTest {
+        val writing = WritingExecutor()
+        val parted = FfmpegMediaEngine(MediaProber(resolver, runner), resolver, writing, maxClipsPerPart = 2) { DefaultFfmpegCommandBuilder() }
+        val seen = mutableListOf<MediaProcessingProgress>()
+        val collector = backgroundScope.launch { parted.observeProgress("proj-1").collect { seen += it } }
+        runCurrent()
+        parted.render(longProject(), renderOutput())
+        runCurrent(); collector.cancel()
+        // 12 s of video: the parts are the first 12 s of 24, the final pass the rest.
+        assertTrue(seen.all { it.totalDurationMs == 24_000L })
+        assertTrue(seen.any { it.processedDurationMs == 13_000L })
+    }
+
+    // ---- subtitle extraction ----
+    private fun subtitleExtraction(out: File = File(tmp.root, "out.srt")) = io.bsoft.bconverter.media.api.SubtitleExtractionRequest(
+        "job-1", request.input, request.metadata.copy(subtitleStreams = listOf(io.bsoft.bconverter.domain.model.SubtitleStream(2, "eng", "subrip"))), out,
+        io.bsoft.bconverter.domain.model.SubtitleExtractionSettings(0, io.bsoft.bconverter.domain.model.SubtitleOutput.SRT),
+    )
+
+    @Test fun subtitle_extraction_runs_the_built_command_under_the_job_id() = runTest {
+        val req = subtitleExtraction().also { it.outputFile.writeText("1\n") }
+        assertEquals(MediaProcessingResult.Success(req.outputFile), engine.extractSubtitle(req))
+        assertEquals(listOf(FakeFfmpegExecutor.Call("job-1", DefaultFfmpegCommandBuilder().buildSubtitleExtractionCommand(req).toArguments())), executor.calls)
+    }
+
+    @Test fun subtitle_extraction_without_output_failure_and_cancellation_are_mapped() = runTest {
+        assertTrue(engine.extractSubtitle(subtitleExtraction()) is MediaProcessingResult.Failure)
+        executor.result = FfmpegExecResult.Failure(2)
+        assertTrue((engine.extractSubtitle(subtitleExtraction()) as MediaProcessingResult.Failure).message.contains("2"))
+        executor.result = FfmpegExecResult.Cancelled
+        assertEquals(MediaProcessingResult.Cancelled, engine.extractSubtitle(subtitleExtraction()))
     }
 }

@@ -1,23 +1,26 @@
 package io.bsoft.bconverter.feature.preview
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -25,12 +28,13 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.bsoft.bconverter.R
+import io.bsoft.bconverter.core.ui.BConverterTheme
 import io.bsoft.bconverter.feature.converter.formatDuration
 import io.bsoft.bconverter.media.player.PlaybackError
 import io.bsoft.bconverter.media.player.PlaybackState
 import io.bsoft.bconverter.media.player.PlaybackStatus
 
-/** Stateless transport controls: play/pause, seek slider, elapsed / total time, and a plain-language error. */
+/** Stateless transport controls: a round play/pause button, a seek slider, elapsed / total time, and a plain-language error. */
 @Composable
 fun PreviewControls(
     state: PlaybackState,
@@ -40,31 +44,52 @@ fun PreviewControls(
 ) {
     val usable = state.status == PlaybackStatus.Ready || state.status == PlaybackStatus.Ended
     val seekLabel = stringResource(R.string.preview_seek)
+    val brand = BConverterTheme.brand
+    val colors = MaterialTheme.colorScheme
     Column(modifier) {
         state.error?.let {
             Text(
                 stringResource(it.messageRes()),
-                color = MaterialTheme.colorScheme.error,
+                color = colors.error,
+                style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(vertical = 4.dp).semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onPlayPause, enabled = usable) {
-                Icon(
-                    imageVector = if (state.isPlaying) PauseIcon else Icons.Filled.PlayArrow,
-                    contentDescription = stringResource(if (state.isPlaying) R.string.preview_pause else R.string.preview_play),
-                )
+            IconButton(
+                onClick = onPlayPause,
+                enabled = usable,
+                modifier = Modifier.size(48.dp),
+                colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White, disabledContentColor = colors.onSurface.copy(alpha = 0.38f)),
+            ) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape)
+                        .then(if (usable) Modifier.background(brand.signature) else Modifier.background(colors.surfaceContainerHighest)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(if (state.isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
+                        contentDescription = stringResource(if (state.isPlaying) R.string.preview_pause else R.string.preview_play),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
             Slider(
                 value = state.progress,
                 onValueChange = { onSeek((it * state.durationMs).toLong()) },
                 enabled = usable,
-                modifier = Modifier.weight(1f).semantics { contentDescription = seekLabel },
+                colors = SliderDefaults.colors(
+                    thumbColor = colors.onSurface,
+                    activeTrackColor = colors.primary,
+                    inactiveTrackColor = colors.surfaceContainerHighest,
+                ),
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp).semantics { contentDescription = seekLabel },
             )
             Text(
                 stringResource(R.string.preview_time, formatDuration(state.positionMs), formatDuration(state.durationMs)),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 8.dp),
+                // Tabular figures keep the time from jittering while it counts.
+                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                color = colors.onSurfaceVariant,
             )
         }
     }
@@ -75,14 +100,4 @@ private fun PlaybackError.messageRes(): Int = when (this) {
     PlaybackError.SourceNotFound -> R.string.preview_error_open
     PlaybackError.Unsupported, PlaybackError.Decoder -> R.string.preview_error_unsupported
     PlaybackError.Unknown -> R.string.preview_error_generic
-}
-
-/** Material's pause glyph (not part of the core icon set, so drawn here). */
-private val PauseIcon: ImageVector by lazy {
-    ImageVector.Builder("Pause", 24.dp, 24.dp, 24f, 24f).apply {
-        path(fill = SolidColor(Color.Black)) {
-            moveTo(6f, 19f); horizontalLineToRelative(4f); verticalLineTo(5f); horizontalLineTo(6f); close()
-            moveTo(14f, 5f); verticalLineToRelative(14f); horizontalLineToRelative(4f); verticalLineTo(5f); close()
-        }
-    }.build()
 }

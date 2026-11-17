@@ -21,11 +21,13 @@ class FakeMediaEngine : MediaEngine {
     var onConvert: ((ConversionRequest) -> Unit)? = null
     var onExtract: ((AudioExtractionRequest) -> Unit)? = null
     var onRender: ((VideoProject, RenderOutput) -> Unit)? = null
+    var onExtractSubtitle: ((SubtitleExtractionRequest) -> Unit)? = null
 
     val probedSources = mutableListOf<MediaSource>()
     val converted = mutableListOf<ConversionRequest>()
     val extracted = mutableListOf<AudioExtractionRequest>()
     val rendered = mutableListOf<Pair<VideoProject, RenderOutput>>()
+    val extractedSubtitles = mutableListOf<SubtitleExtractionRequest>()
     val cancelledJobIds = mutableListOf<String>()
     private val progressFlows = mutableMapOf<String, MutableSharedFlow<MediaProcessingProgress>>()
 
@@ -44,6 +46,12 @@ class FakeMediaEngine : MediaEngine {
     override suspend fun extractAudio(request: AudioExtractionRequest): MediaProcessingResult {
         extracted += request
         onExtract?.invoke(request)
+        convertError?.let { throw it }
+        return convertGate?.await() ?: processingResult
+    }
+    override suspend fun extractSubtitle(request: SubtitleExtractionRequest): MediaProcessingResult {
+        extractedSubtitles += request
+        onExtractSubtitle?.invoke(request)
         convertError?.let { throw it }
         return convertGate?.await() ?: processingResult
     }

@@ -45,9 +45,15 @@ class ConversionSession(
     suspend fun runExtraction(request: AudioExtractionRequest, releaseInput: Boolean = true) =
         runJob(request.jobId, listOf(request.input), request.outputFile, releaseInput) { engine.extractAudio(request) }
 
+    suspend fun runSubtitleExtraction(request: io.bsoft.bconverter.media.api.SubtitleExtractionRequest, releaseInput: Boolean = true) =
+        runJob(request.jobId, listOf(request.input), request.outputFile, releaseInput) { engine.extractSubtitle(request) }
+
     /** Renders a project; its id is the engine job id (use a unique id per render). */
-    suspend fun runRender(project: VideoProject, output: File, inputs: List<ResolvedInput>, releaseInput: Boolean = true) =
-        runJob(project.id, inputs, output, releaseInput) { engine.render(project, RenderOutput(output)) }
+    suspend fun runRender(
+        project: VideoProject, output: File, inputs: List<ResolvedInput>, releaseInput: Boolean = true,
+        subtitles: io.bsoft.bconverter.domain.render.RenderSubtitles = io.bsoft.bconverter.domain.render.RenderSubtitles.None,
+        overlays: List<io.bsoft.bconverter.domain.overlay.OverlayLayer> = emptyList(),
+    ) = runJob(project.id, inputs, output, releaseInput) { engine.render(project, RenderOutput(output, subtitles, overlays)) }
 
     private suspend fun runJob(
         jobId: String,

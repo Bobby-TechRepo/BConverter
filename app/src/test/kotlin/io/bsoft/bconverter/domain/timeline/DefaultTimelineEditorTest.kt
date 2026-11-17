@@ -42,16 +42,21 @@ class DefaultTimelineEditorTest {
     }
 
     // ---- playhead ----
-    @Test fun the_playhead_is_kept_within_the_timeline() {
+    @Test fun the_playhead_is_kept_within_the_seek_range() {
         val e = editor()
         e.seekTo(12_345); assertEquals(12_345L, e.state.value.playheadMs)
         e.seekTo(-5); assertEquals(0L, e.state.value.playheadMs)
-        e.seekTo(99_999); assertEquals(35_000L, e.state.value.playheadMs)
+        e.seekTo(99_999); assertEquals(35_000L + SeekRange.BLANK_TAIL_MS, e.state.value.playheadMs)
+    }
+
+    @Test fun the_playhead_can_rest_in_the_blank_area_after_the_last_clip() {
+        val e = editor(); e.seekTo(38_000)
+        assertEquals(38_000L, e.state.value.playheadMs)
     }
 
     @Test fun the_playhead_follows_a_shrinking_timeline() {
-        val e = editor(); e.seekTo(35_000); e.removeClip("c")
-        assertEquals(30_000L, e.state.value.playheadMs)
+        val e = editor(); e.seekTo(45_000); e.removeClip("c")
+        assertEquals(30_000L + SeekRange.BLANK_TAIL_MS, e.state.value.playheadMs)
     }
 
     // ---- editing ----
@@ -115,5 +120,27 @@ class DefaultTimelineEditorTest {
     @Test fun the_history_limit_applies_to_the_editor() {
         val e = editor(limit = 1); ok(e.removeClip("a")); ok(e.removeClip("b"))
         assertTrue(e.undo()); assertFalse(e.undo())
+    }
+
+    // ---- load (reopening a saved project) ----
+    @Test fun loading_replaces_the_timeline_and_resets_selection_playhead_and_history() {
+        val e = editor(); e.select("a"); e.seekTo(3_000); e.removeClip("c")
+        val loaded = TL.timeline(TL.video("x", 4_000), TL.video("y", 6_000))
+        e.load(loaded)
+        val s = e.state.value
+        assertEquals(loaded, s.timeline); assertNull(s.selectedClipId); assertEquals(0L, s.playheadMs)
+        assertFalse(s.canUndo); assertFalse(s.canRedo); assertFalse(e.undo())
+    }
+
+    @Test fun a_loaded_timeline_is_laid_out_back_to_back() {
+        val e = editor()
+        e.load(Timeline(videoClips = listOf(TL.video("x", 4_000, start = 50), TL.video("y", 6_000, start = 99))))
+        assertEquals(listOf(0L, 4_000L), e.timeline.videoClips.map { it.startTimeMs })
+    }
+
+    @Test fun editing_works_after_a_load_and_can_be_undone_back_to_the_loaded_state() {
+        val e = editor(); val loaded = TL.timeline(TL.video("x", 4_000))
+        e.load(loaded); e.removeClip("x")
+        assertTrue(e.timeline.videoClips.isEmpty()); assertTrue(e.undo()); assertEquals(loaded, e.timeline)
     }
 }

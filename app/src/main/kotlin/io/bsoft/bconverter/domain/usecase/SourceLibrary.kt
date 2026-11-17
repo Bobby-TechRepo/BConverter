@@ -8,6 +8,7 @@ import io.bsoft.bconverter.domain.model.ProbeFailure
 import io.bsoft.bconverter.domain.model.ProbeOutcome
 import io.bsoft.bconverter.domain.model.ResolvedInput
 import io.bsoft.bconverter.domain.repository.InputResolver
+import io.bsoft.bconverter.domain.timeline.Timeline
 import io.bsoft.bconverter.domain.timeline.VideoProject
 
 /**
@@ -62,6 +63,12 @@ class SourceLibrary(private val prober: MediaProber, private val resolver: Input
             timeline = project.timeline.mapSources { staged[it] ?: it },
             sourceMetadata = entries.values.associate { MediaSource.FileSource(it.input.file) as MediaSource to it.metadata },
         )
+    }
+
+    /** [timeline] with every staged source replaced by its file, for preview; sources that are not staged are left unchanged. */
+    fun staged(timeline: Timeline): Timeline {
+        val files = entries.mapValues { (_, entry) -> MediaSource.FileSource(entry.input.file) as MediaSource }
+        return timeline.mapSources { files[it] ?: it }
     }
 
     fun releaseAll() {

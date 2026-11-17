@@ -33,6 +33,8 @@ interface FfmpegCommandBuilder {
 
     fun buildAudioExtractionCommand(request: AudioExtractionRequest): FfmpegCommand
 
+    fun buildSubtitleExtractionCommand(request: io.bsoft.bconverter.media.api.SubtitleExtractionRequest): FfmpegCommand
+
     /** Throws [IllegalArgumentException] if the project cannot be planned; callers validate with `RenderPlanner` first. */
     fun buildRenderCommand(project: VideoProject, output: RenderOutput): FfmpegCommand
 }

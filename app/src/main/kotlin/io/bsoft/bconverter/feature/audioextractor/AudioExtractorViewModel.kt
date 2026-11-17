@@ -16,6 +16,7 @@ import io.bsoft.bconverter.domain.model.MediaSource
 import io.bsoft.bconverter.domain.model.ProbeFailure
 import io.bsoft.bconverter.domain.model.ProbeOutcome
 import io.bsoft.bconverter.domain.model.ProcessingState
+import io.bsoft.bconverter.domain.model.SavedOutput
 import io.bsoft.bconverter.domain.model.ResolvedInput
 import io.bsoft.bconverter.domain.repository.CapabilitySource
 import io.bsoft.bconverter.domain.repository.InputResolver
@@ -185,10 +186,10 @@ class AudioExtractorViewModel @Inject constructor(
         val temp = staging.newFile("$jobId.${settings.format.extension}")
         val request = AudioExtractionRequest(jobId, resolved, source.metadata, temp, settings)
         _state.update { it.copy(stage = ConverterStage.Extracting, message = null) }
-        track(jobs.launch(ExportJob(jobId, source.displayName, ExportTask.Extract(request), destination)), jobId)
+        track(jobs.launch(ExportJob(jobId, source.displayName, ExportTask.Extract(request), destination)), jobId, SavedOutput(destination, settings.format.mimeType))
     }
 
-    private fun track(status: StateFlow<JobStatus>, jobId: String) {
+    private fun track(status: StateFlow<JobStatus>, jobId: String, saved: SavedOutput) {
         activeJobId = jobId
         statusJob = viewModelScope.launch {
             val terminal = status
@@ -201,7 +202,7 @@ class AudioExtractorViewModel @Inject constructor(
             jobs.finish(jobId)
             activeJobId = null
             when (terminal) {
-                JobStatus.Completed -> { releaseInput(); _state.update { it.copy(stage = ConverterStage.Completed, processing = ProcessingState.Idle) } }
+                JobStatus.Completed -> { releaseInput(); _state.update { it.copy(stage = ConverterStage.Completed, processing = ProcessingState.Idle, saved = saved) } }
                 is JobStatus.Failed ->
                     backToForm(if (terminal.reason == JobFailure.SaveFailed) ConverterMessage.SaveFailed else ConverterMessage.ConversionFailed)
                 else -> backToForm(null) // cancelled

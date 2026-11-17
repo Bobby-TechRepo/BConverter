@@ -34,7 +34,16 @@ data class AudioStream(
     val language: String? = null,
 )
 
-data class SubtitleStream(val index: Int, val language: String?, val codec: String? = null)
+data class SubtitleStream(
+    val index: Int,
+    val language: String?,
+    val codec: String? = null,
+    val title: String? = null,
+    val isDefault: Boolean = false,
+    val isForced: Boolean = false,
+) {
+    val kind: SubtitleKind get() = SubtitleCodecInfo.kind(codec)
+}
 
 data class MediaMetadata(
     val durationMs: Long,

@@ -4,6 +4,7 @@ import io.bsoft.bconverter.domain.model.AudioCodec
 import io.bsoft.bconverter.domain.model.AudioSettings
 import io.bsoft.bconverter.domain.model.ContainerFormat
 import io.bsoft.bconverter.domain.model.ExportPreset
+import io.bsoft.bconverter.domain.model.ExportSize
 import io.bsoft.bconverter.domain.model.Resolution
 import io.bsoft.bconverter.domain.model.VideoQuality
 import io.bsoft.bconverter.domain.model.VideoSettings
@@ -19,10 +20,13 @@ import kotlin.math.roundToInt
  */
 class ExportSettingsFactory(private val capabilities: MediaCapabilityRepository) {
 
-    fun create(preset: ExportPreset, container: ContainerFormat, reference: Resolution?): ExportSettings? {
+    fun create(preset: ExportPreset, container: ContainerFormat, reference: Resolution?, size: ExportSize = ExportSize.AUTO): ExportSettings? {
         val availableVideo = capabilities.getVideoCodecs(container)
         val videoCodec = CodecPreferences.VIDEO.firstOrNull { it in availableVideo } ?: return null
-        val canvas = if (preset == ExportPreset.SMALL_FILE) cappedTo720(reference) else null
+        val canvas = when (size) {
+            ExportSize.AUTO -> if (preset == ExportPreset.SMALL_FILE) cappedTo720(reference) else null
+            else -> size.cap(reference)
+        }
         val effective = canvas ?: reference ?: FULL_HD
         val quality = if (videoCodec.crfRange() != null && capabilities.supportsCrf(videoCodec)) {
             VideoQuality.Crf(crf(preset))

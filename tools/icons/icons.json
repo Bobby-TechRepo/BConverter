@@ -1,0 +1,142 @@
+{
+  "_comment": "App icon name -> candidate Glyphs names (tried in order; '-outline' variant first, then the plain name). Edit freely; run: python tools/icons/fetch_glyphs.py",
+  "autoMirrored": [
+    "ic_arrow_back",
+    "ic_chevron_right",
+    "ic_tool_undo",
+    "ic_tool_redo",
+    "ic_tool_move_earlier",
+    "ic_tool_move_later"
+  ],
+  "icons": {
+    "ic_arrow_back": [
+      "arrow?flip=horizontal",
+      "chevron?flip=horizontal"
+    ],
+    "ic_play": [
+      "play",
+      "play-1"
+    ],
+    "ic_pause": [
+      "pause",
+      "pause-1"
+    ],
+    "ic_more_vertical": [
+      "ellipsis?rotate=90deg",
+      "ellipsis"
+    ],
+    "ic_delete": [
+      "trash",
+      "trash-1",
+      "bin",
+      "delete"
+    ],
+    "ic_convert_video": [
+      "video",
+      "film",
+      "movie",
+      "video-camera",
+      "camera-video"
+    ],
+    "ic_extract_audio": [
+      "music",
+      "music-note",
+      "audio",
+      "note"
+    ],
+    "ic_video_editor": [
+      "scissors",
+      "cut",
+      "edit"
+    ],
+    "ic_projects": [
+      "folder",
+      "folder-1"
+    ],
+    "ic_settings": [
+      "sliders",
+      "settings",
+      "adjust",
+      "cog"
+    ],
+    "ic_about": [
+      "info",
+      "info-circle",
+      "information"
+    ],
+    "ic_chevron_right": [
+      "chevron",
+      "angle"
+    ],
+    "ic_check": [
+      "check",
+      "check-circle",
+      "tick"
+    ],
+    "ic_share": [
+      "share",
+      "share-1",
+      "share-2"
+    ],
+    "ic_tool_add_video": [
+      "video-plus",
+      "film-plus",
+      "plus-video",
+      "video"
+    ],
+    "ic_tool_add_audio": [
+      "music-plus",
+      "plus-music",
+      "music"
+    ],
+    "ic_tool_undo": [
+      "arrow-u-turn?flip=horizontal",
+      "arrow-turn?flip=horizontal"
+    ],
+    "ic_tool_redo": [
+      "arrow-u-turn",
+      "arrow-turn"
+    ],
+    "ic_tool_split": [
+      "split",
+      "scissors",
+      "cut"
+    ],
+    "ic_tool_trim": [
+      "crop",
+      "trim",
+      "scissors"
+    ],
+    "ic_tool_detach_audio": [
+      "music-note",
+      "unlink",
+      "music"
+    ],
+    "ic_tool_transition": [
+      "copy",
+      "layer-back",
+      "film"
+    ],
+    "ic_tool_speed": [
+      "playback-speed",
+      "speedometer-3",
+      "timer-fast"
+    ],
+    "ic_tool_volume": [
+      "volume-2",
+      "volume"
+    ],
+    "ic_tool_replace": [
+      "arrows-exchange",
+      "repeat"
+    ],
+    "ic_tool_move_earlier": [
+      "arrow?flip=horizontal",
+      "chevron-double?flip=horizontal"
+    ],
+    "ic_tool_move_later": [
+      "arrow",
+      "chevron-double"
+    ]
+  }
+}

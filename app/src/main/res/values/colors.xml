@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window and splash colours; keep in step with BrandLightColors / BrandDarkColors in core/ui/Theme.kt. -->
+    <color name="bc_background">#FFF7F7FB</color>
+    <color name="bc_iris">#FF6A4CFF</color>
+</resources>

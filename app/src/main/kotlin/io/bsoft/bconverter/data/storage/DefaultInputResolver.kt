@@ -3,6 +3,9 @@ package io.bsoft.bconverter.data.storage
 import android.net.Uri
 import io.bsoft.bconverter.core.storage.ContentReader
 import io.bsoft.bconverter.core.storage.FreeSpaceProvider
+import io.bsoft.bconverter.core.storage.InPlaceHandle
+import io.bsoft.bconverter.core.storage.InPlaceOpener
+import java.util.concurrent.ConcurrentHashMap
 import io.bsoft.bconverter.core.storage.StagingDirectory
 import io.bsoft.bconverter.domain.model.ContentInfo
 import io.bsoft.bconverter.domain.model.InputError
@@ -27,7 +30,12 @@ class DefaultInputResolver(
     private val ioDispatcher: CoroutineDispatcher,
     private val validator: MediaFileValidator = MediaFileValidator(),
     private val bufferSize: Int = DEFAULT_BUFFER_SIZE_BYTES,
+    /** Reads documents where they are when possible (step 15); null = always copy. */
+    private val inPlace: InPlaceOpener? = null,
 ) : InputResolver {
+    /** In-place inputs still open, by path; released with the input. */
+    private val openInPlace = ConcurrentHashMap<String, InPlaceHandle>()
+
 
     override suspend fun resolve(source: MediaSource): ResolveResult = withContext(ioDispatcher) {
         when (source) {
@@ -37,6 +45,7 @@ class DefaultInputResolver(
     }
 
     override fun release(input: ResolvedInput) {
+        openInPlace.remove(input.file.path)?.let { runCatching { it.close() }; return }
         if (input.isStaged) input.file.delete()
     }
 
@@ -47,6 +56,17 @@ class DefaultInputResolver(
             return failure(e)
         }
         (validator.validate(info) as? ValidationResult.Invalid)?.let { return ResolveResult.Failure(it.error) }
+
+        // No copy when the document can be read where it is: instant, and no second copy of a large video on the device.
+        inPlace?.let { opener ->
+            val handle = try { opener.open(uri, staging.newFile(info.displayName)) } catch (e: Exception) { null }
+            if (handle != null) {
+                openInPlace[handle.file.path] = handle
+                val size = info.sizeBytes?.takeIf { it > 0 } ?: handle.file.length()
+                // isStaged: the link is app-owned and must be released, exactly like a copy.
+                return ResolveResult.Success(ResolvedInput(handle.file, info.displayName ?: FALLBACK_NAME, size, isStaged = true))
+            }
+        }
 
         info.sizeBytes?.let { required ->
             val available = freeSpace.availableBytes(staging.root)

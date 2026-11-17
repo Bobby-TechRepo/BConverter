@@ -98,4 +98,16 @@ class SourceLibraryTest {
         library.releaseAllExcept(listOf(staged1))
         assertEquals(listOf(staged2), resolver.released); assertTrue(library.inputs().isEmpty())
     }
+
+    @Test fun a_timeline_can_be_viewed_through_the_staged_files_for_preview() = runTest {
+        val added = library.add(uri1) as SourceLibrary.AddResult.Added
+        val unknown = MediaSource.UriSource(uri2)
+        val timeline = Timeline(listOf(
+            VideoClip("a", added.source, 12_345, 0, 12_345), VideoClip("b", unknown, 5_000, 0, 5_000),
+        )).normalized()
+        val staged = library.staged(timeline)
+        assertEquals(MediaSource.FileSource(staged1.file), staged.videoClips[0].source)
+        assertEquals(unknown, staged.videoClips[1].source) // not staged: left as is so the preview can say it is unavailable
+        assertEquals(timeline.videoClips.map { it.id }, staged.videoClips.map { it.id })
+    }
 }

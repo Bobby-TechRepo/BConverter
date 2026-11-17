@@ -1,6 +1,7 @@
 package io.bsoft.bconverter.feature.converter
 
 import android.net.Uri
+import io.bsoft.bconverter.domain.model.SavedOutput
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -27,6 +28,7 @@ import io.bsoft.bconverter.fakes.FakeFfprobeRunner
 import io.bsoft.bconverter.fakes.FakeInputResolver
 import io.bsoft.bconverter.fakes.FakeMediaEngine
 import io.bsoft.bconverter.fakes.FakeOutputPublisher
+import io.bsoft.bconverter.domain.usecase.AdvancedOptions
 import io.bsoft.bconverter.domain.usecase.ExportJobExecutor
 import io.bsoft.bconverter.domain.usecase.ExportJobLauncher
 import io.bsoft.bconverter.domain.usecase.ExportRegistry
@@ -154,6 +156,41 @@ class ConverterViewModelTest {
         val vm = opened(); vm.onPresetSelected(ConversionPreset.SMALL_FILE)
         assertEquals(ConversionPreset.SMALL_FILE, vm.state.value.form!!.preset)
         assertEquals(VideoQuality.Crf(28), vm.video().quality)
+    }
+
+    // ---- advanced settings ----
+    @Test fun advanced_audio_overrides_reach_the_settings() = runTest(dispatcher) {
+        val vm = opened()
+        vm.onAdvancedChanged(AdvancedOptions(channels = 1, sampleRateHz = 48000))
+        assertEquals(1, vm.audio().channels); assertEquals(48000, vm.audio().sampleRateHz)
+        assertEquals(1, vm.state.value.form!!.advanced.channels)
+    }
+
+    @Test fun a_crf_override_replaces_the_presets_quality_when_the_encoder_supports_it() = runTest(dispatcher) {
+        val vm = opened(); vm.onVideoCodecSelected(VideoCodec.H264); vm.onPresetSelected(ConversionPreset.BALANCED)
+        val range = vm.state.value.choices.crfRange
+        if (range != null) {
+            vm.onAdvancedChanged(AdvancedOptions(quality = VideoQuality.Crf(range.last)))
+            assertEquals(VideoQuality.Crf(range.last), vm.video().quality)
+        }
+    }
+
+    @Test fun choosing_a_preset_starts_afresh() = runTest(dispatcher) {
+        val vm = opened(); vm.onAdvancedChanged(AdvancedOptions(channels = 1)); vm.onPresetSelected(ConversionPreset.HIGH_QUALITY)
+        assertEquals(AdvancedOptions(), vm.state.value.form!!.advanced)
+    }
+
+    @Test fun overrides_that_no_longer_apply_are_dropped_when_the_streams_are_copied() = runTest(dispatcher) {
+        val vm = opened(); vm.onAdvancedChanged(AdvancedOptions(channels = 1))
+        vm.onPresetSelected(ConversionPreset.ORIGINAL_QUALITY)
+        val s = vm.state.value
+        if (s.settings!!.audio !is AudioPlan.Encode) assertEquals(AdvancedOptions(), s.form!!.advanced)
+    }
+
+    @Test fun the_choices_describe_the_current_settings() = runTest(dispatcher) {
+        val vm = opened()
+        assertEquals(vm.state.value.settings!!.audio is AudioPlan.Encode, vm.state.value.choices.audioEncoded)
+        assertTrue(vm.state.value.choices.videoEncoded)
     }
 
     @Test fun choosing_a_container_recomputes_settings_and_the_codec_options() = runTest(dispatcher) {
@@ -318,5 +355,19 @@ class ConverterViewModelTest {
     // ---- preview ----
     @Test fun the_staged_file_is_offered_for_preview() = runTest(dispatcher) {
         assertEquals(staged.file, opened().state.value.source!!.previewFile)
+    }
+
+    // ---- sharing (spec Phase 16) ----
+    @Test fun a_finished_conversion_remembers_where_it_was_saved_so_it_can_be_shared() = runTest(dispatcher) {
+        engine.onConvert = { it.outputFile.writeText("converted") }
+        val vm = opened(); assertNull(vm.state.value.saved)
+        converting(vm)
+        assertEquals(SavedOutput(destination, ContainerFormat.MP4.mimeType), vm.state.value.saved)
+    }
+
+    @Test fun a_failed_conversion_has_nothing_to_share() = runTest(dispatcher) {
+        engine.processingResult = MediaProcessingResult.Failure("boom")
+        val vm = opened(); converting(vm)
+        assertNull(vm.state.value.saved)
     }
 }

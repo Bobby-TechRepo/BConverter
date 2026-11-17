@@ -1,0 +1,1 @@
+Room writes `io.bsoft.bconverter.data.database.AppDatabase/<version>.json` here on every build (see `ksp { arg("room.schemaLocation", …) }` in `app/build.gradle.kts`). Commit those files: auto-migrations and `MigrationTestHelper` read them.

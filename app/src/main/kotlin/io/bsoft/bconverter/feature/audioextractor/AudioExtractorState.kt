@@ -4,6 +4,7 @@ import io.bsoft.bconverter.domain.model.AudioExtractionSettings
 import io.bsoft.bconverter.domain.model.AudioFormat
 import io.bsoft.bconverter.domain.model.ConversionIssue
 import io.bsoft.bconverter.domain.model.ProcessingState
+import io.bsoft.bconverter.domain.model.SavedOutput
 import io.bsoft.bconverter.feature.converter.ConverterMessage
 import io.bsoft.bconverter.feature.converter.ConverterStage
 import io.bsoft.bconverter.feature.converter.SourceInfo
@@ -28,4 +29,6 @@ data class AudioExtractorUiState(
     val issues: List<ConversionIssue> = emptyList(),
     val message: ConverterMessage? = null,
     val processing: ProcessingState = ProcessingState.Idle,
+    /** Where the finished audio file was saved; set when the extraction completes. */
+    val saved: SavedOutput? = null,
 )

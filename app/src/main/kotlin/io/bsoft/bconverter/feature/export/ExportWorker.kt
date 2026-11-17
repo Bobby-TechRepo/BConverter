@@ -59,6 +59,7 @@ class ExportWorker(
             throw e
         } catch (e: Exception) {
             // The system may refuse a foreground service right now; keep working without the notification.
+            io.bsoft.bconverter.core.diagnostics.AppLog.nonFatal("Export", "Foreground notification refused", e)
         }
     }
 

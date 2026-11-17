@@ -32,7 +32,7 @@ class RenderPlannerTest {
         val p = plan(TL.project(single()))
         assertEquals(listOf(RenderInput(File("/tmp/a"), 0, 10_000)), p.inputs)
         assertEquals(Canvas(1920, 1080, 30.0), p.canvas)
-        assertEquals(listOf(VideoSegment(0, 1f)), p.videoSegments); assertEquals(10_000L, p.durationMs)
+        assertEquals(listOf(VideoSegment(0, 1f, durationMs = 10_000, sourceWidth = 1920, sourceHeight = 1080)), p.videoSegments); assertEquals(10_000L, p.durationMs)
     }
 
     @Test fun several_clips_keep_their_order_and_add_up() {
@@ -74,7 +74,7 @@ class RenderPlannerTest {
     @Test fun audio_clips_become_delayed_overlays_after_the_video_inputs() {
         val t = TL.withAudio(single(), listOf(TL.audio("m", 5_000, start = 2_000, volume = 0.5f, sourceStart = 1_000, sourceDuration = 8_000)))
         val p = plan(TL.project(t))
-        assertEquals(listOf(OverlayAudio(1, 0.5f, 2_000)), p.overlays)
+        assertEquals(listOf(OverlayAudio(1, 0.5f, 2_000, durationMs = 5_000)), p.overlays)
         assertEquals(RenderInput(File("/tmp/m"), 1_000, 5_000), p.inputs[1])
     }
 
@@ -123,5 +123,46 @@ class RenderPlannerTest {
         val uri = MediaSource.UriSource(Uri.parse("content://x/1"))
         val clip = VideoClip("a", uri, 10_000, 0, 10_000)
         assertEquals(RenderError.SourceNotStaged(uri), error(TL.project(Timeline(videoClips = listOf(clip)).normalized())))
+    }
+
+    // ---- transitions ----
+    private fun cross(ms: Long = 1_000) = io.bsoft.bconverter.domain.timeline.Transition(io.bsoft.bconverter.domain.timeline.TransitionType.CROSSFADE, ms)
+    private fun fade(ms: Long = 1_000) = io.bsoft.bconverter.domain.timeline.Transition(io.bsoft.bconverter.domain.timeline.TransitionType.FADE_BLACK, ms)
+
+    @Test fun segments_carry_their_timeline_place_and_the_join_before_them() {
+        val t = Timeline(listOf(TL.video("a", 10_000), TL.video("b", 10_000).copy(transitionIn = cross(1_000)), TL.video("c", 5_000).copy(transitionIn = fade(500)))).normalized()
+        val p = plan(TL.project(t))
+        assertEquals(listOf(0L, 9_000L, 19_000L), p.videoSegments.map { it.startMs })
+        assertEquals(listOf(10_000L, 10_000L, 5_000L), p.videoSegments.map { it.durationMs })
+        assertEquals(
+            listOf(
+                io.bsoft.bconverter.domain.timeline.JoinEffect.None,
+                io.bsoft.bconverter.domain.timeline.JoinEffect(io.bsoft.bconverter.domain.timeline.TransitionType.CROSSFADE, 1_000),
+                io.bsoft.bconverter.domain.timeline.JoinEffect(io.bsoft.bconverter.domain.timeline.TransitionType.FADE_BLACK, 500),
+            ),
+            p.videoSegments.map { it.join },
+        )
+    }
+
+    @Test fun a_crossfade_makes_the_rendered_video_shorter_but_still_reads_each_clip_whole() {
+        val p = plan(TL.project(Timeline(listOf(TL.video("a", 10_000), TL.video("b", 10_000).copy(transitionIn = cross(1_000)))).normalized()))
+        assertEquals(19_000L, p.durationMs); assertEquals(listOf(10_000L, 10_000L), p.inputs.map { it.durationMs })
+    }
+
+    @Test fun a_muted_clip_contributes_silence_instead_of_its_own_sound() {
+        val p = plan(TL.project(TL.timeline(TL.video("a", 10_000), TL.video("b", 5_000, muted = true))))
+        assertEquals(listOf(0, null), p.originalAudio!!.map { it.inputIndex })
+        assertEquals(5_000L, p.originalAudio!![1].timelineDurationMs)
+    }
+
+    @Test fun when_every_clip_is_muted_there_is_no_original_audio_at_all() {
+        assertEquals(null, plan(TL.project(TL.timeline(TL.video("a", 10_000, muted = true)))).originalAudio)
+    }
+
+    @Test fun a_sped_up_audio_clip_reads_its_whole_source_span_and_carries_its_speed() {
+        val t = TL.withAudio(TL.timeline(TL.video("a", 20_000)), listOf(TL.audio("m", 6_000, start = 1_000, speed = 2f)))
+        val p = plan(TL.project(t))
+        assertEquals(listOf(OverlayAudio(1, 1f, 1_000, 2f, durationMs = 3_000)), p.overlays)
+        assertEquals(6_000L, p.inputs[1].durationMs)
     }
 }

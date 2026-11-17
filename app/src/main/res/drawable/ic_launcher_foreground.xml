@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher mark: a play button inside a turning arrow (edit + convert). Drawn inside the 66 dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M69.32,41.14 A20,20 0 1,1 38.68,41.14"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="5" android:strokeLineCap="round" android:fillColor="#00000000" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M42.73,36.32 L34.08,37.29 L43.28,45.00 Z" />
+    <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineJoin="round"
+        android:pathData="M49.5,45.5 L49.5,62.5 L63.5,54 Z" />
+</vector>

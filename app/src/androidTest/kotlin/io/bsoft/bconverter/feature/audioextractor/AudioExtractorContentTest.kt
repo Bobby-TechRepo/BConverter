@@ -1,6 +1,10 @@
 package io.bsoft.bconverter.feature.audioextractor
 
+import io.bsoft.bconverter.domain.model.SavedOutput
+import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -77,6 +81,11 @@ class AudioExtractorContentTest {
         assertEquals(false, value)
     }
 
+    @Test fun the_copy_switch_row_is_at_least_48dp_tall_to_tap() {
+        show(configure())
+        rule.onNode(androidx.compose.ui.test.isToggleable()).performScrollTo().assertHeightIsAtLeast(48.dp)
+    }
+
     @Test fun when_copy_is_impossible_the_user_is_told_why() {
         show(configure(canCopy = false))
         rule.onNodeWithText(s(R.string.extractor_reencode_hint)).performScrollTo().assertIsDisplayed()
@@ -107,5 +116,14 @@ class AudioExtractorContentTest {
         rule.onNodeWithText(s(R.string.extractor_saved)).assertIsDisplayed()
         rule.onNodeWithText(s(R.string.extractor_extract_another)).performClick()
         assertTrue(again)
+    }
+
+    // ---- sharing (spec Phase 16) ----
+    @Test fun a_finished_extraction_can_be_shared() {
+        val saved = SavedOutput(Uri.parse("content://flow/audio"), "audio/mp4")
+        var shared: SavedOutput? = null
+        show(configure().copy(stage = ConverterStage.Completed, saved = saved), ExtractorActions(onShare = { shared = it }))
+        rule.onNodeWithText(s(R.string.share)).performClick()
+        assertEquals(saved, shared)
     }
 }

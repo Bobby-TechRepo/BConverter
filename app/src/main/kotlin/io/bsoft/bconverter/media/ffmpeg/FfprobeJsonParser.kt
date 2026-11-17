@@ -38,7 +38,12 @@ class FfprobeJsonParser {
                     index, s.text("codec_name"), s.text("sample_rate")?.toIntOrNull(), s.text("channels")?.toIntOrNull(),
                     s.text("bit_rate")?.toLongOrNull(), s.language(),
                 )
-                "subtitle" -> subtitles += SubtitleStream(index, s.language(), s.text("codec_name"))
+                "subtitle" -> subtitles += SubtitleStream(
+                    index, s.language(), s.text("codec_name"),
+                    title = s.optJSONObject("tags")?.text("title"),
+                    isDefault = s.optJSONObject("disposition")?.optInt("default") == 1,
+                    isForced = s.optJSONObject("disposition")?.optInt("forced") == 1,
+                )
             }
         }
         if (video.isEmpty() && audio.isEmpty() && subtitles.isEmpty()) {

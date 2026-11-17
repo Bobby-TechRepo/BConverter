@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher background: the brand's iris → violet → rose signature gradient. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108">
+                <item android:offset="0" android:color="#FF6A4CFF" />
+                <item android:offset="0.55" android:color="#FF8E44E6" />
+                <item android:offset="1" android:color="#FFC93A6E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- A soft highlight in the top-left for depth. -->
+    <path android:fillColor="#1AFFFFFF" android:pathData="M0,0h70a70,70 0 0,1 -70,70z" />
+</vector>

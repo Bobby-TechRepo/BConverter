@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder in the Glyphs outline style (80x80 grid, 5 stroke): a tray with an arrow going out (exports). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:pathData="M12,46V64H68V46" android:strokeColor="#FF000000" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M40,50V14M26,28L40,14L54,28" android:strokeColor="#FF000000" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

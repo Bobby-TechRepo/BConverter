@@ -9,8 +9,13 @@ import java.io.File
 sealed interface ExportTask {
     data class Convert(val request: ConversionRequest) : ExportTask
     data class Extract(val request: AudioExtractionRequest) : ExportTask
+    data class ExtractSubtitle(val request: io.bsoft.bconverter.media.api.SubtitleExtractionRequest) : ExportTask
     /** Renders [project] into [outputFile]; [inputs] are the staged copies of its sources, owned by the job. */
-    data class Render(val project: VideoProject, val outputFile: File, val inputs: List<ResolvedInput>) : ExportTask
+    data class Render(
+        val project: VideoProject, val outputFile: File, val inputs: List<ResolvedInput>,
+        /** Prepared subtitle files; they are temporary and deleted with the job. */
+        val subtitles: io.bsoft.bconverter.domain.render.RenderSubtitles = io.bsoft.bconverter.domain.render.RenderSubtitles.None,
+    ) : ExportTask
 }
 
 /** A unit of background work: run the task into a temp file, then save it to [destination]. */
@@ -19,18 +24,25 @@ data class ExportJob(val id: String, val title: String, val task: ExportTask, va
         get() = when (task) {
             is ExportTask.Convert -> listOf(task.request.input)
             is ExportTask.Extract -> listOf(task.request.input)
+            is ExportTask.ExtractSubtitle -> listOf(task.request.input)
             is ExportTask.Render -> task.inputs
         }
+    /** Temporary files besides [outputFile] that the job owns. */
+    val tempFiles: List<File>
+        get() = (task as? ExportTask.Render)?.subtitles?.files.orEmpty()
     val outputFile: File
         get() = when (task) {
             is ExportTask.Convert -> task.request.outputFile
             is ExportTask.Extract -> task.request.outputFile
+            is ExportTask.ExtractSubtitle -> task.request.outputFile
             is ExportTask.Render -> task.outputFile
         }
 }
 
 enum class JobFailure {
     ConversionFailed, SaveFailed,
+    /** A text overlay could not be drawn (the export is stopped rather than leaving the text out). */
+    OverlaysFailed,
     /** The process was restarted and no longer knows the job (jobs cannot resume after process death). */
     Interrupted,
 }

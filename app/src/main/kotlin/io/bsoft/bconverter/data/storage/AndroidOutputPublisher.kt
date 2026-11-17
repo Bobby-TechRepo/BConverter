@@ -33,6 +33,7 @@ class AndroidOutputPublisher(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            io.bsoft.bconverter.core.diagnostics.AppLog.nonFatal("Publish", "Copying the result to its destination failed", e)
             PublishResult.Failure
         }
     }

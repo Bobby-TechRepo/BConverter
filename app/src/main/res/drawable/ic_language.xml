@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Language: a globe, Glyphs-style outline (80x80 grid, 5 stroke). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:pathData="M40,10A30,30 0,1 1,39.99,10ZM10,40H70M40,10C31,18 27,29 27,40C27,51 31,62 40,70M40,10C49,18 53,29 53,40C53,51 49,62 40,70"
+        android:strokeColor="#FF000000" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+</vector>

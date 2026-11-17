@@ -53,4 +53,32 @@ class ExportRegistryTest {
         assertFalse(JobStatus.Queued.isTerminal); assertFalse(JobStatus.Running(0.1f).isTerminal); assertFalse(JobStatus.Publishing.isTerminal)
         listOf(JobStatus.Completed, JobStatus.Failed(JobFailure.SaveFailed), JobStatus.Cancelled).forEach { assertTrue(it.isTerminal) }
     }
+
+    @Test fun statuses_track_every_live_job_until_it_is_removed() {
+        registry.register(job("a")); registry.register(job("b")); registry.update("a", JobStatus.Running(0.2f))
+        assertEquals(mapOf("a" to JobStatus.Running(0.2f), "b" to JobStatus.Queued), registry.statuses.value)
+        registry.remove("a")
+        assertEquals(setOf("b"), registry.statuses.value.keys)
+    }
+
+    @Test fun the_listener_hears_the_start_and_the_first_final_status_only() {
+        val heard = mutableListOf<String>()
+        val listened = ExportRegistry(object : ExportRegistry.Listener {
+            override fun started(job: ExportJob) { heard += "start:${job.id}" }
+            override fun finished(jobId: String, status: JobStatus) { heard += "end:$jobId:$status" }
+        })
+        listened.register(job()); listened.update("j1", JobStatus.Running(0.5f)); listened.update("j1", JobStatus.Completed)
+        listened.update("j1", JobStatus.Cancelled)
+        assertEquals(listOf("start:j1", "end:j1:Completed"), heard)
+    }
+
+    @Test fun job_records_map_tasks_and_final_statuses() {
+        val record = JobRecords.started(job(), 42)
+        assertEquals(JobKind.EXTRACT_AUDIO, record.kind); assertEquals(JobOutcome.RUNNING, record.outcome); assertEquals(42L, record.startedAtMs)
+        assertEquals(JobOutcome.COMPLETED, JobRecords.outcomeOf(JobStatus.Completed))
+        assertEquals(JobOutcome.CANCELLED, JobRecords.outcomeOf(JobStatus.Cancelled))
+        assertEquals(JobOutcome.INTERRUPTED, JobRecords.outcomeOf(JobStatus.Failed(JobFailure.Interrupted)))
+        assertEquals(JobOutcome.SAVE_FAILED, JobRecords.outcomeOf(JobStatus.Failed(JobFailure.SaveFailed)))
+        assertNull(JobRecords.outcomeOf(JobStatus.Publishing))
+    }
 }

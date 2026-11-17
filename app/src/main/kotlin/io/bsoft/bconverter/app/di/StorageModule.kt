@@ -13,6 +13,7 @@ import io.bsoft.bconverter.core.storage.FreeSpaceProvider
 import io.bsoft.bconverter.core.storage.StagingDirectory
 import io.bsoft.bconverter.data.storage.DefaultInputResolver
 import io.bsoft.bconverter.data.storage.AndroidOutputPublisher
+import io.bsoft.bconverter.data.storage.AndroidInPlaceOpener
 import io.bsoft.bconverter.domain.repository.InputResolver
 import io.bsoft.bconverter.domain.repository.OutputPublisher
 import java.io.File
@@ -40,10 +41,15 @@ object StorageModule {
         AndroidOutputPublisher(context.contentResolver, dispatcher)
 
     @Provides @Singleton
+    fun documentCreator(@ApplicationContext context: Context, @IoDispatcher dispatcher: CoroutineDispatcher): io.bsoft.bconverter.domain.repository.DocumentCreator =
+        io.bsoft.bconverter.data.storage.AndroidDocumentCreator(context.contentResolver, dispatcher)
+
+    @Provides @Singleton
     fun inputResolver(
+        @ApplicationContext context: Context,
         reader: ContentReader,
         staging: StagingDirectory,
         freeSpace: FreeSpaceProvider,
         @IoDispatcher dispatcher: CoroutineDispatcher,
-    ): InputResolver = DefaultInputResolver(reader, staging, freeSpace, dispatcher)
+    ): InputResolver = DefaultInputResolver(reader, staging, freeSpace, dispatcher, inPlace = AndroidInPlaceOpener(context.contentResolver))
 }
